@@ -1,0 +1,13 @@
+Slackware ARM kernel, boot firmware, devices and hacks for Raspberry Pi
+
+This script will build the following Slackware ARM packages:
+  raspi-boot
+  raspi-devs
+  raspi-hacks
+  kernel_raspi
+  kernel-modules-raspi
+
+Before running this script, $CWD/linux and $CWD/firmware must contain these
+git repos:
+  git clone git://github.com/raspberrypi/linux.git linux
+  git clone git://github.com/raspberrypi/firmware.git firmware

@@ -1,0 +1,21 @@
+raspi-hacks -- modifications for ArmedSlack on Raspberry Pi
+
+This package will make the following changes to the ArmedSlack
+installation on your Raspberry Pi:
+
+* Serial port - /etc/inittab will be modified to replace the 'Local serial
+lines' entries s0, s1 and s2.  The Rasberry Pi's UART is /dev/ttyAMA0, not
+/dev/ttyS0.  This prevents the error 'INIT: Id "s0" respawning too fast'.
+
+* Clock - the Raspberry Pi has no hardware clock and boots with the
+date/time set to 1970-01-01, so /etc/rc.d/rc.local will be modified to
+set the correct date/time from the network (using the 'sntp' command).
+Also, to provide a pragmatic approximation for the correct date/time
+during early boot and if the network is unavailable, /sbin/hwclock will be
+replaced by a shellscript which saves the date/time to disk on shutdown
+and restores it on startup.  This prevents the error 'Cannot access the
+Hardware Clock via any known method'.
+
+* Tuning - /etc/sysctl.conf will be created to tune vm.min_free_kbytes.
+This prevents the error 'smsc95xx 1-1.1:1.0: eth0: kevent 2 may have
+been dropped'.

@@ -1,0 +1,88 @@
+#!/bin/sh
+
+# Copyright 2006, 2008, 2009  Patrick J. Volkerding, Sebeka, MN, USA
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# Tweaked for Raspberry Pi by David Spencer <baildon.research@googlemail.com>
+# s/kernel-modules/kernel-modules-raspi/, $OUTPUT, $TAG, $PKGTYPE ;-)
+
+VERSION=${VERSION:-3.1.9}
+ARCH=${ARCH:-arm}
+BUILD=${BUILD:-1}
+TAG=${TAG:-}
+
+CWD=$(pwd)
+TMP=${TMP:-/tmp}
+OUTPUT=${OUTPUT:-/tmp}
+PKG=$TMP/package-kernel-modules-raspi
+
+rm -rf $PKG
+mkdir -p $TMP $PKG
+
+echo "Using /lib/modules/${VERSION}/"
+echo "Make sure these are *ready*... compressed, or not."
+echo "However you want 'em."
+sleep 5
+mkdir -p $PKG/lib/modules
+cp -a /lib/modules/${VERSION} $PKG/lib/modules
+mkdir -p $PKG/etc/rc.d
+cat $CWD/rc.modules.new > $PKG/etc/rc.d/rc.modules-${VERSION}.new
+chmod 755 $PKG/etc/rc.d/rc.modules-${VERSION}.new
+
+mkdir -p $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+
+# Write out the doinst.sh:
+cat << EOF > $PKG/install/doinst.sh
+config() {
+  NEW="\$1"
+  OLD="\$(dirname \$NEW)/\$(basename \$NEW .new)"
+  # If there's no config file by that name, mv it over:
+  if [ ! -r \$OLD ]; then
+    mv \$NEW \$OLD
+  elif [ "\$(cat \$OLD | md5sum)" = "\$(cat \$NEW | md5sum)" ]; then # toss the redundant copy
+    rm \$NEW
+  fi
+  # Otherwise, we leave the .new copy for the admin to consider...
+}
+config etc/rc.d/rc.modules-${VERSION}.new
+
+# If rc.modules is a real file, back it up:
+if [ -r etc/rc.d/rc.modules -a ! -L etc/rc.d/rc.modules ]; then
+  cp -a etc/rc.d/rc.modules etc/rc.d/rc.modules.bak 
+fi
+# Make rc.modules a symlink if it's not already, but do not replace
+# an existing symlink.  You'll have to decide to point at a new version
+# of this script on your own...
+if [ ! -L etc/rc.d/rc.modules ]; then
+  ( cd etc/rc.d ; rm -rf rc.modules )
+  ( cd etc/rc.d ; ln -sf rc.modules-${VERSION} rc.modules )
+fi
+
+# A good idea whenever kernel modules are added or changed:
+if [ -x sbin/depmod ]; then
+  chroot . /sbin/depmod -a ${VERSION} 1> /dev/null 2> /dev/null
+fi
+
+EOF
+
+cd $PKG
+/sbin/makepkg -l y -c n $OUTPUT/kernel-modules-raspi-$(echo ${VERSION} | tr - _)-$ARCH-$BUILD$TAG.${PKGTYPE:-tgz}
+

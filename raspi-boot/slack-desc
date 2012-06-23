@@ -1,0 +1,19 @@
+# HOW TO EDIT THIS FILE:
+# The "handy ruler" below makes it easier to edit a package description.  Line
+# up the first '|' above the ':' following the base package name, and the '|'
+# on the right side marks the last column you can put a character in.  You must
+# make exactly 11 lines for the formatting to be correct.  It's also
+# customary to leave one space after the ':' except on otherwise blank lines.
+
+          |-----handy-ruler------------------------------------------------------|
+raspi-boot: raspi-boot (Raspberry Pi boot firmware)
+raspi-boot:
+raspi-boot: Closed source boot firmware blobs for the Raspberry Pi. You need these
+raspi-boot: blobs to be able to boot the Pi.
+raspi-boot:
+raspi-boot: https://github.com/raspberrypi/firmware
+raspi-boot:
+raspi-boot:
+raspi-boot:
+raspi-boot:
+raspi-boot:

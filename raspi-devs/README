@@ -1,0 +1,29 @@
+#!/bin/sh
+# device nodes for Raspberry Pi
+# David Spencer <baildon.research@googlemail.com> 16 June 2012
+
+mknod -m 660 mmcblk0    b 179  0
+mknod -m 660 mmcblk0p1  b 179  1
+mknod -m 660 mmcblk0p2  b 179  2
+mknod -m 660 mmcblk0p3  b 179  3
+mknod -m 660 mmcblk0p4  b 179  4
+mknod -m 660 mmcblk0p5  b 179  5
+mknod -m 660 mmcblk0p6  b 179  6
+mknod -m 660 mmcblk0p7  b 179  7
+mknod -m 660 mmcblk0p8  b 179  8
+mknod -m 660 mmcblk0p9  b 179  9
+mknod -m 660 mmcblk0p10 b 179 10
+mknod -m 660 mmcblk0p11 b 179 11
+mknod -m 660 mmcblk0p12 b 179 12
+mknod -m 660 mmcblk0p13 b 179 13
+mknod -m 660 mmcblk0p14 b 179 14
+mknod -m 660 mmcblk0p15 b 179 15
+chown root:disk mmcblk*
+
+mknod -m 600 usbdev1.1  c 189  0
+mknod -m 600 usbdev1.2  c 189  1
+mknod -m 600 usbdev1.3  c 189  2
+chown root:root usbdev*
+
+mknod -m 660 ttyAMA0    c 204 64
+chown root:dialout ttyAMA*

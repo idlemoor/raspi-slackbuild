@@ -1,0 +1,37 @@
+#!/bin/sh
+# rc.modules 12.3456789  Sun May 10 05:31:26 UTC 2009  pp (rb), pjv, rlw
+#
+# This file loads extra drivers into the Linux kernel.
+#
+# The modules will be looked for under /lib/modules/<kernel version number>
+# On systems using udev, this file should remain mostly commented out.  
+# Nearly all hardware device modules will be loaded automatically on such 
+# systems.  This file should only be used when udev is not loading a module 
+# that you require, or if you are not using udev (which is going to become 
+# increasingly impossible...), or if you want to force a particular module 
+# to be loaded where alternatives exist.
+#
+# Many Linux kernel modules will accept extra options.  The Linux kernel
+# source is the best place to look for extra documentation for the various
+# modules.  This can be found under /usr/src/linux/Documentation if you've
+# the installed the kernel sources. 
+
+# Determine the version of the running kernel:
+RELEASE=$(uname -r)
+
+### Update module dependencies ###
+# If /usr is mounted and we have 'find', we can try to take a shortcut:
+if [ -x /usr/bin/find -a -e /lib/modules/$RELEASE/modules.dep \
+     -a /lib/modules/$RELEASE/modules.dep -nt /etc/modules.conf ]; then
+  NEWMODS="$(/usr/bin/find /lib/modules/$RELEASE -mindepth 2 -type f -newer /lib/modules/$RELEASE/modules.dep)"
+  # Only rebuild dependencies if new module(s) are found:
+  if [ ! "" = "$NEWMODS" ]; then
+    echo "Updating module dependencies for Linux $RELEASE:"
+    /sbin/depmod -a
+  else
+    echo "Module dependencies up to date (no new kernel modules found)."
+  fi
+else # we don't have find, or there is no existing modules.dep, or it is out of date.
+  echo "Updating module dependencies for Linux $RELEASE:"
+  /sbin/depmod -A
+fi

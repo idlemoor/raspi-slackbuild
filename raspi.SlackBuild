@@ -1,0 +1,242 @@
+#!/bin/sh
+
+# raspi.SlackBuild
+# Slackware ARM kernel, boot firmware, devices and hacks for Raspberry Pi
+#
+# Copyright 2012 David Spencer, Baildon, West Yorkshire, U.K.
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+#------------------------------------------------------------------------------
+
+# This script will build the following packages:
+#   raspi-boot
+#   raspi-devs
+#   raspi-hacks
+#   kernel_raspi
+#   kernel-modules-raspi
+#
+# Before running this script, $CWD/linux and $CWD/firmware must contain these git repos:
+#   git clone https://github.com/raspberrypi/linux.git linux
+#   git clone https://github.com/raspberrypi/firmware.git firmware
+
+#------------------------------------------------------------------------------
+
+# The memory allocation for the OS and GPU is set here (or by an env variable).
+# LINUXMEM must be set to 224 or 192 or 128.
+# Use the 224Mb version by default (upstream has 192Mb by default, but this
+# seems pointless until accelerated video works).
+LINUXMEM=${LINUXMEM:-224}
+# The GPU will get the rest of memory, i.e. (256-$LINUXMEM) Mb.
+
+#------------------------------------------------------------------------------
+
+KNLARCH=${KNLARCH:-arm}
+BUILD=${BUILD:-1}
+TAG=${TAG:-}
+
+TMP=${TMP:-/tmp}
+OUTPUT=${OUTPUT:-/tmp}
+
+NUMJOBS=${NUMJOBS:--j1}
+
+unset ARCH
+CWD=$(pwd)
+
+set -e
+
+#------------------------------------------------------------------------------
+PKGNAM=raspi-boot
+PKGARCH=fw
+#------------------------------------------------------------------------------
+
+echo "########################################"
+echo "#### $PKGNAM"
+echo "#### $(date)"
+echo "########################################"
+
+PKG=$TMP/package-$PKGNAM
+rm -rf $PKG
+mkdir -p $PKG
+
+cd $CWD/firmware/boot
+PKGVER=g$(git log --format='%h' -n 1)
+
+chown root:root *
+chmod 644 *
+
+mkdir -p $PKG/boot
+cp -a \
+  arm*_start.elf bootcode.bin loader.bin \
+  $CWD/$PKGNAM/README.initrd \
+  $PKG/boot
+cp -a \
+  arm${LINUXMEM:-224}_start.elf \
+  $PKG/boot/start.elf
+
+# Install as .new even though it's not in /etc
+cat <<EOF > $PKG/boot/config.txt.new
+disable_overscan=1
+EOF
+
+mkdir -p $PKG/usr/doc/$PKGNAM-$PKGVER
+cp -a \
+  LICENCE.broadcom \
+  $PKG/usr/doc/$PKGNAM-$PKGVER
+
+mkdir -p $PKG/install
+cat $CWD/$PKGNAM/slack-desc > $PKG/install/slack-desc
+cat $CWD/$PKGNAM/doinst.sh > $PKG/install/doinst.sh
+
+cd $PKG
+/sbin/makepkg -l y -c n $OUTPUT/$PKGNAM-$PKGVER-$PKGARCH-$BUILD$TAG.${PKGTYPE:-tgz}
+
+#------------------------------------------------------------------------------
+PKGNAM=raspi-devs
+PKGARCH=noarch
+PKGVER=13.37
+#------------------------------------------------------------------------------
+
+echo "########################################"
+echo "#### $PKGNAM"
+echo "#### $(date)"
+echo "########################################"
+
+PKG=$TMP/package-$PKGNAM
+rm -rf $PKG
+mkdir -p $PKG
+
+cd $PKG
+explodepkg $CWD/$PKGNAM/_devs.tar.gz
+
+mkdir -p $PKG/install
+cat $CWD/$PKGNAM/slack-desc > $PKG/install/slack-desc
+
+cd $PKG
+/sbin/makepkg -l y -c n $OUTPUT/$PKGNAM-$PKGVER-$PKGARCH-$BUILD$TAG.${PKGTYPE:-tgz}
+
+#------------------------------------------------------------------------------
+PKGNAM=raspi-hacks
+#------------------------------------------------------------------------------
+
+echo "########################################"
+echo "#### $PKGNAM"
+echo "#### $(date)"
+echo "########################################"
+
+cd $CWD/$PKGNAM
+BUILD=$BUILD TAG=$TAG \
+TMP=$TMP OUTPUT=$OUTPUT \
+  sh $PKGNAM.SlackBuild
+
+#------------------------------------------------------------------------------
+PKGNAM=kernel_raspi
+PKGARCH=$KNLARCH
+#------------------------------------------------------------------------------
+
+echo "########################################"
+echo "#### $PKGNAM"
+echo "#### $(date)"
+echo "########################################"
+
+PKG=$TMP/package-$PKGNAM
+rm -rf $PKG
+mkdir -p $PKG
+
+cd $CWD/linux
+# git reset --hard
+# git clean -f -d
+make mrproper
+
+# Package names & versions conform with Slackware/Armedslack as follows:
+#   kernel_raspi has an underscore, but kernel-modules-raspi has dashes
+#   kernel_raspi version is e.g. 3.1.9_g6789abc
+#   kernel-modules-raspi version is e.g. 3.1.9_raspi_g6789abc
+# (we can drop the _g6789abc when upstream stabilises)
+LOCALVER='-raspi'
+cat $CWD/$PKGNAM/config-raspi.in | sed "s/@LOCALVERSION@/$LOCALVER/" > .config
+make silentoldconfig
+head -4 Makefile | sed 's/ *= */=/' > $TMP/versionvars
+. $TMP/versionvars
+rm $TMP/versionvars
+KNLVER="${VERSION}.${PATCHLEVEL}.${SUBLEVEL}${EXTRAVERSION}-g$(git log --format='%h' -n 1)"
+MODVER="${VERSION}.${PATCHLEVEL}.${SUBLEVEL}${EXTRAVERSION}${LOCALVER}-g$(git log --format='%h' -n 1)"
+echo Kernel version is $KNLVER
+echo Modules version is $MODVER
+PKGVER=$(echo "$KNLVER" | tr - _)
+
+make Image $NUMJOBS
+
+mkdir -p $PKG/boot
+# It's no longer necessary to wrap the Image, but zImage isn't acceptable.
+cp arch/arm/boot/Image $PKG/boot/kernel.img
+cp System.map $PKG/boot/System.map
+
+# Stash this in /usr/doc to avoid confusion with Pi-specific /boot/config.txt
+mkdir -p $PKG/usr/doc/$PKGNAM-$PKGVER
+cat .config > $PKG/usr/doc/$PKGNAM-$PKGVER/config
+
+# Create /boot/cmdline.txt copied from kernel config
+# Install as .new even though it's not in /etc
+# Root device will be filled in by doinst.sh
+grep 'CONFIG_CMDLINE=' .config | \
+  sed -e 's/CONFIG_CMDLINE="//' -e 's/"$//' -e 's:/root=/dev/mmcblk0p[0-9]*:root=@ROOTDEV@:' \
+  > $PKG/boot/cmdline.txt.new
+
+mkdir -p $PKG/install
+cat $CWD/$PKGNAM/slack-desc > $PKG/install/slack-desc
+cat $CWD/$PKGNAM/doinst.sh > $PKG/install/doinst.sh
+
+cd $PKG
+/sbin/makepkg -l y -c n $OUTPUT/$PKGNAM-$PKGVER-$PKGARCH-$BUILD$TAG.${PKGTYPE:-tgz}
+
+#------------------------------------------------------------------------------
+PKGNAM=kernel-modules-raspi
+PKGARCH=$KNLARCH
+PKGVER=$(echo "$MODVER" | tr - _)
+#------------------------------------------------------------------------------
+
+echo "########################################"
+echo "#### $PKGNAM"
+echo "#### $(date)"
+echo "########################################"
+
+PKG=$TMP/package-$PKGNAM
+rm -rf $PKG
+mkdir -p $PKG
+
+cd $CWD/linux
+make modules $NUMJOBS
+make modules_install
+
+# Lie about where the source is ;-)
+cd /lib/modules/$MODVER
+rm build;  ln -s /usr/src/linux build
+rm source; ln -s /usr/src/linux source
+
+# Now make the package
+cd $CWD/$PKGNAM
+ARCH=$KNLARCH \
+VERSION=$MODVER BUILD=$BUILD TAG=$TAG \
+TMP=$TMP OUTPUT=$OUTPUT \
+  sh $PKGNAM.SlackBuild
+
+#------------------------------------------------------------------------------
+
+exit 0

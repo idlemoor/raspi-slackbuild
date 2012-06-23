@@ -1,0 +1,25 @@
+initrd notes for Raspberry Pi
+-----------------------------
+
+If you were expecting to see the usual README.mkinitrd file, it's not
+here :-)
+
+This is because the Raspberry Pi boots from a vfat partition, and vfat
+does not support symlinks.  The documentation for mkinitrd is in the
+file /usr/doc/mkinitrd-1.4.6/README.initrd
+
+You don't need an initrd for the supplied Raspberry Pi kernel, but if
+you want to run mkinitrd, use the -s and -o control arguments so that
+mkinitrd does not attempt to use /boot, for example
+
+  mkinitrd -c -s /tmp/initrd-tree -o /tmp/initrd.gz \
+    -k 3.1.9-raspi-g801f610 -f ext4 -m ext4 -r /dev/mmcblk0p2
+
+Because the Pi does not have a bootloader, you cannot actually use your
+initrd.gz file.  You must embed your initrd tree into a custom kernel.
+To do this, specify the path to the root of your initrd tree in the
+kernel config variable INITRAMFS_SOURCE, which is under "General setup"
+-> "Initial RAM filesystem and RAM disk (initrd/initramfs support)" ->
+"Initramfs source file(s)", for example
+
+  INITRAMFS_SOURCE = /tmp/initrd-tree
