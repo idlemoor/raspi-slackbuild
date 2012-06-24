@@ -104,6 +104,10 @@ mkdir -p $PKG/install
 cat $CWD/$PKGNAM/slack-desc > $PKG/install/slack-desc
 cat $CWD/$PKGNAM/doinst.sh > $PKG/install/doinst.sh
 
+# Add version stamp into /boot
+echo "$PKGNAM-$PKGVER-$PKGARCH-$BUILD$TAG $(date -u '+%F %T')" \
+  > $PKG/boot/version-$PKGNAM.txt
+
 cd $PKG
 /sbin/makepkg -l y -c n $OUTPUT/$PKGNAM-$PKGVER-$PKGARCH-$BUILD$TAG.${PKGTYPE:-tgz}
 
@@ -202,6 +206,10 @@ grep 'CONFIG_CMDLINE=' .config | \
 mkdir -p $PKG/install
 cat $CWD/$PKGNAM/slack-desc > $PKG/install/slack-desc
 cat $CWD/$PKGNAM/doinst.sh > $PKG/install/doinst.sh
+
+# Add version stamp into /boot
+echo "$PKGNAM-$PKGVER-$PKGARCH-$BUILD$TAG $(date -u '+%F %T')" \
+  > $PKG/boot/version-$PKGNAM.txt
 
 cd $PKG
 /sbin/makepkg -l y -c n $OUTPUT/$PKGNAM-$PKGVER-$PKGARCH-$BUILD$TAG.${PKGTYPE:-tgz}
