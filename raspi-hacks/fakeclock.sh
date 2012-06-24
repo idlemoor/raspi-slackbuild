@@ -32,9 +32,13 @@
 # do not need to be modified.
 #
 # The only control argument recognised is --hctosys.  All other arguments
-# are ignored.  If --hctosys is present, the date/time is restored from
-# /etc/fakeclock or the newest entry in /var/log (whichever is newer).
-# Otherwise, the date/time is saved to /etc/fakeclock.  
+# are ignored.
+#
+# If --hctosys is present, the system clock is set from the last mount
+# date/time of the root filesystem (if it's ext2/3/4), or the newest file in
+# /var/log (if that exists), or the file /etc/fakeclock (if that exists).
+#
+# Otherwise, the system clock is saved by touching the file /etc/fakeclock.
 #
 # The script will only set the system clock when the system clock currently is
 # before the year 1971.  This permits the safe use of this script if an RTC is
@@ -52,21 +56,44 @@ do
 done
 
 if [ "$action" = 'restore' ]; then
+
   if [ $(date '+%Y') -lt '1971' ]; then
-    mydate="19900101000000"
-    if [ -f /etc/fakeclock ]; then
-      mydate=$(TZ=0 stat -c %y /etc/fakeclock | cut -c '1-4,6-7,9-10,12-13,15-16,18-19')
+
+    # We'll work in big-endian numeric strings (i.e. +%Y%m%d%H%M%S) so they
+    # can be compared as integers.  First, set a catch-all default:
+    mydate='197101010000'
+
+    # Try the root filesystem.  This is a good option because it prevents
+    # fsck complaining in the next bit of rc.S.
+    rtype=$(mount | fgrep '/dev/root' | cut -f5 -d' ')
+    if [ "$rtype" = 'ext4' -o "$rtype" = 'ext3' -o "$rtype" = 'ext2' ]; then
+      fsdate=$(date --date="$(dumpe2fs -h /dev/root 2>/dev/null | fgrep 'Last mount time' | cut -c27-50)" '+%Y%m%d%H%M%S')
+      [ "$fsdate" -gt "$mydate" ] && mydate="$fsdate"
     fi
+
+    # Try /var/log, but won't get anything if it's on a separate fs.
     if [ -d /var/log ]; then
-      vldate=0
       newest=$(ls -t /var/log 2>/dev/null | head -1)
-      [ -n "$newest" ] && vldate=$(TZ=0 stat -c %y /var/log/"$newest" | cut -c '1-4,6-7,9-10,12-13,15-16,18-19')
-      [ "$vldate" -gt "$mydate" ] && mydate="$vldate"
+      if [ -n "$newest" ]; then
+        vldate=$(TZ=0 stat -c %y /var/log/"$newest" | cut -c '1-4,6-7,9-10,12-13,15-16,18-19')
+        [ "$vldate" -gt "$mydate" ] && mydate="$vldate"
+      fi
     fi
+
+    # If we were shutdown cleanly, this will exist:
+    if [ -f /etc/fakeclock ]; then
+      fkdate=$(TZ=0 stat -c %y /etc/fakeclock | cut -c '1-4,6-7,9-10,12-13,15-16,18-19')
+      [ "$fkdate" -gt "$mydate" ] && mydate="$fkdate"
+    fi
+
+    echo 'fakeclock.sh: Setting fallback date/time.'
     date --utc "${mydate:4:8}${mydate:0:4}.${mydate:12:2}"
+
   fi
+
   # We still need the original hwclock to set the system timezone.
   /sbin/hwclock.orig --systz
+
 else
   # save
   touch /etc/fakeclock
