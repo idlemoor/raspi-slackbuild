@@ -1,0 +1,110 @@
+#!/bin/sh
+
+# kernel_raspi.SlackBuild
+# Kernel and modules for Raspberry Pi
+#
+# Copyright 2012 David Spencer, Baildon, West Yorkshire, U.K.
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+PRGNAM=kernel_raspi
+# Version will be taken from source's git rev
+BUILD=${BUILD:-1}
+TAG=${TAG:-}
+
+KNLARCH=${ARCH:-arm}
+unset ARCH
+
+CWD=$(pwd)
+TMP=${TMP:-/tmp}
+PKG=$TMP/package-$PRGNAM
+OUTPUT=${OUTPUT:-/tmp}
+
+set -e
+
+rm -rf $PKG
+mkdir -p $PKG
+
+cd $CWD/linux
+make mrproper
+
+# Package names & versions conform with Slackware/ARMedslack as follows:
+#   kernel_raspi has an underscore, but kernel-modules-raspi has dashes
+#   kernel_raspi version is e.g. 3.1.9_g6789abc
+#   kernel-modules-raspi version is e.g. 3.1.9_raspi_g6789abc
+# (we can drop the _g6789abc when upstream stabilises)
+LOCALVER='-raspi'
+cat $CWD/config-raspi.in | sed "s/@LOCALVERSION@/$LOCALVER/" > .config
+make silentoldconfig
+head -4 Makefile | sed 's/ *= */=/' > $TMP/versionvars
+. $TMP/versionvars
+rm $TMP/versionvars
+KNLVER="${VERSION}.${PATCHLEVEL}.${SUBLEVEL}${EXTRAVERSION}-g$(git log --format='%h' -n 1)"
+MODVER="${VERSION}.${PATCHLEVEL}.${SUBLEVEL}${EXTRAVERSION}${LOCALVER}-g$(git log --format='%h' -n 1)"
+PKGVER=$(echo "$KNLVER" | tr - _)
+
+make Image $NUMJOBS
+
+mkdir -p $PKG/boot
+# It's no longer necessary to wrap the Image, but zImage isn't acceptable.
+cp arch/arm/boot/Image $PKG/boot/kernel.img
+cp System.map $PKG/boot/System.map
+
+# Put this in /usr/doc to avoid confusion with Pi-specific /boot/config.txt
+mkdir -p $PKG/usr/doc/$PRGNAM-$PKGVER
+cat .config > $PKG/usr/doc/$PRGNAM-$PKGVER/config
+
+# Create /boot/cmdline.txt copied from kernel config
+# Install as .new even though it's not in /etc
+# Root device will be filled in by doinst.sh
+grep 'CONFIG_CMDLINE=' .config | \
+  sed -e 's/CONFIG_CMDLINE="//' -e 's/"$//' -e 's:/root=/dev/mmcblk0p[0-9]*:root=@ROOTDEV@:' \
+  > $PKG/boot/cmdline.txt.new
+
+mkdir -p $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+cat $CWD/doinst.sh > $PKG/install/doinst.sh
+
+# Add version stamp into /boot
+echo "$PRGNAM-$PKGVER-$KNLARCH-$BUILD$TAG $(date -u '+%F %T')" \
+  > $PKG/boot/version-$PRGNAM.txt
+
+cd $PKG
+/sbin/makepkg -l y -c n $OUTPUT/$PRGNAM-$PKGVER-$KNLARCH-$BUILD$TAG.${PKGTYPE:-tgz}
+
+#------------------------------------------------------------------------------
+
+# Prepare and install the modules.  The kernel-modules SlackBuild traditionally
+# just picks them up from the running system.
+cd $CWD/linux
+make modules $NUMJOBS
+make modules_install
+
+# Lie about where the source is ;-)
+cd /lib/modules/$MODVER
+rm build;  ln -s /usr/src/linux build
+rm source; ln -s /usr/src/linux source
+
+# Call kernel-modules-raspi.SlackBuild from here, so that we can tell it the
+# version.
+cd $CWD
+ARCH=$KNLARCH VERSION=$MODVER \
+BUILD=$BUILD TAG=$TAG \
+TMP=$TMP OUTPUT=$OUTPUT \
+  sh kernel-modules-raspi.SlackBuild

@@ -1,5 +1,6 @@
 #!/bin/sh
-# device nodes for Raspberry Pi
+
+# Device nodes for Raspberry Pi
 # David Spencer <baildon.research@googlemail.com> 16 June 2012
 
 mknod -m 660 mmcblk0    b 179  0

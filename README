@@ -1,6 +1,6 @@
-Slackware ARM kernel, boot firmware, devices and hacks for Raspberry Pi
+Kernel, boot firmware, devices and hacks for Raspberry Pi
 
-This script will build the following Slackware ARM packages:
+This script will build the following packages:
   raspi-boot
   raspi-devs
   raspi-hacks

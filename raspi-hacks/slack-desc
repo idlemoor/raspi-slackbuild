@@ -8,7 +8,7 @@
            |-----handy-ruler------------------------------------------------------|
 raspi-hacks: raspi-hacks (modifications for Raspberry Pi)
 raspi-hacks:
-raspi-hacks: This package modifies your ArmedSlack installation with various
+raspi-hacks: This package modifies your Slackware ARM installation with various
 raspi-hacks: Raspberry Pi specific hacks.  For details see the supplied README.
 raspi-hacks:
 raspi-hacks:

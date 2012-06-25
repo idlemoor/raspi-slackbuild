@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# raspi.SlackBuild
-# Kernel, boot firmware, devices and hacks for Raspberry Pi
+# raspi-devs.SlackBuild
+# Device nodes for Raspberry Pi
 #
 # Copyright 2012 David Spencer, Baildon, West Yorkshire, U.K.
 # All rights reserved.
@@ -23,45 +23,28 @@
 #  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 #  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#------------------------------------------------------------------------------
-#
-# This script will build the following packages:
-#   raspi-boot
-#   raspi-devs
-#   raspi-hacks
-#   kernel_raspi
-#   kernel-modules-raspi
-#
-# Before running this script, kernel_raspi/linux and raspi-boot/firmware must contain these git repos:
-#   git clone https://github.com/raspberrypi/linux.git kernel_raspi/linux
-#   git clone https://github.com/raspberrypi/firmware.git raspi-boot/firmware
-#
-#------------------------------------------------------------------------------
-
+PRGNAM=raspi-devs
+VERSION=${VERSION:-13.37}
 BUILD=${BUILD:-1}
 TAG=${TAG:-}
-ARCH=${ARCH:-arm}
 
-TMP=${TMP:-/tmp}
-OUTPUT=${OUTPUT:-/tmp}
+ARCH=noarch
 
 CWD=$(pwd)
+TMP=${TMP:-/tmp}
+PKG=$TMP/package-$PRGNAM
+OUTPUT=${OUTPUT:-/tmp}
 
 set -e
 
-for PKGNAM in raspi-boot raspi-devs raspi-hacks kernel_raspi ; do
-# Note: kernel_raspi.SlackBuild will call kernel-modules-raspi.SlackBuild
+rm -rf $PKG
+mkdir -p $PKG
 
-  echo "########################################"
-  echo "#### $PKGNAM"
-  echo "#### $(date)"
-  echo "########################################"
+cd $PKG
+explodepkg $CWD/_devs.tar.gz
 
-  cd $CWD/$PKGNAM
-  BUILD=$BUILD TAG=$TAG \
-  TMP=$TMP OUTPUT=$OUTPUT \
-    sh $PKGNAM.SlackBuild
+mkdir -p $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
 
-done
-
-exit 0
+cd $PKG
+/sbin/makepkg -l y -c n $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.${PKGTYPE:-tgz}

@@ -1,6 +1,6 @@
-raspi-hacks -- modifications for ArmedSlack on Raspberry Pi
+raspi-hacks -- modifications for Slackware ARM on Raspberry Pi
 
-This package will make the following changes to the ArmedSlack
+This package will make the following changes to the Slackware ARM
 installation on your Raspberry Pi:
 
 * Serial port - /etc/inittab will be modified to replace the 'Local serial

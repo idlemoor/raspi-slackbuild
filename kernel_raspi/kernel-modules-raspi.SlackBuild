@@ -21,7 +21,8 @@
 #  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # Tweaked for Raspberry Pi by David Spencer <baildon.research@googlemail.com>
-# s/kernel-modules/kernel-modules-raspi/, $OUTPUT, $TAG, $PKGTYPE ;-)
+#   s/kernel-modules/kernel-modules-raspi/, slack-desc -> modules-slack-desc,
+#   $VERSION, $OUTPUT, $TAG, $PKGTYPE ;-)
 
 VERSION=${VERSION:-3.1.9}
 ARCH=${ARCH:-arm}
@@ -47,7 +48,7 @@ cat $CWD/rc.modules.new > $PKG/etc/rc.d/rc.modules-${VERSION}.new
 chmod 755 $PKG/etc/rc.d/rc.modules-${VERSION}.new
 
 mkdir -p $PKG/install
-cat $CWD/slack-desc > $PKG/install/slack-desc
+cat $CWD/modules-slack-desc > $PKG/install/slack-desc
 
 # Write out the doinst.sh:
 cat << EOF > $PKG/install/doinst.sh
