@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# raspi.SlackBuild
+# buildraspi.sh
 # Kernel, boot firmware, devices and hacks for Raspberry Pi
 #
 # Copyright 2012 David Spencer, Baildon, West Yorkshire, U.K.
