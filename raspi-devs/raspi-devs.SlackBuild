@@ -41,7 +41,7 @@ rm -rf $PKG
 mkdir -p $PKG
 
 cd $PKG
-explodepkg $CWD/_devs.tar.gz
+explodepkg $CWD/_devs.tar.xz
 
 mkdir -p $PKG/install
 cat $CWD/slack-desc > $PKG/install/slack-desc

@@ -2,6 +2,7 @@
 
 # Device nodes for Raspberry Pi
 # David Spencer <baildon.research@googlemail.com> 16 June 2012
+# The most appropriate documentation for this package is a script :-)
 
 mknod -m 660 mmcblk0    b 179  0
 mknod -m 660 mmcblk0p1  b 179  1

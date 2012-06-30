@@ -2,6 +2,7 @@
 
 # kernel_raspi.SlackBuild
 # Kernel and modules for Raspberry Pi
+# (Note that this SlackBuild will also run kernel-modules-raspi.SlackBuild)
 #
 # Copyright 2012 David Spencer, Baildon, West Yorkshire, U.K.
 # All rights reserved.
@@ -22,6 +23,15 @@
 #  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 #  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 #  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+#------------------------------------------------------------------------------
+#
+# Before you run this SlackBuild you must clone the Raspberry Pi 'linux' git
+# repository into a subdirectory named linux:
+#
+#   git clone git://github.com/raspberrypi/linux.git
+#
+#------------------------------------------------------------------------------
 
 PRGNAM=kernel_raspi
 # Version will be taken from source's git rev
@@ -103,7 +113,7 @@ rm source; ln -s /usr/src/linux source
 
 # Call kernel-modules-raspi.SlackBuild from here, so that we can tell it the
 # version.
-cd $CWD
+cd $CWD/../kernel-modules-raspi
 ARCH=$KNLARCH VERSION=$MODVER \
 BUILD=$BUILD TAG=$TAG \
 TMP=$TMP OUTPUT=$OUTPUT \

@@ -1,0 +1,8 @@
+Kernel SlackBuild for Raspberry Pi
+
+(Note that this SlackBuild will also run kernel-modules-raspi.SlackBuild.)
+
+Before you run this SlackBuild you must clone the Raspberry Pi 'linux' git
+repository into a subdirectory named linux:
+
+  git clone git://github.com/raspberrypi/linux.git

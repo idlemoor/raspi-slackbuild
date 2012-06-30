@@ -25,8 +25,10 @@
 
 #------------------------------------------------------------------------------
 #
-# Before running this script, $CWD/firmware must contain this git repo:
-#   git clone https://github.com/raspberrypi/firmware.git raspi-boot/firmware
+# Before you run this SlackBuild you must clone the Raspberry Pi 'firmware' git
+# repository into a subdirectory named firmware:
+#
+#   git clone git://github.com/raspberrypi/firmware.git
 #
 #------------------------------------------------------------------------------
 
@@ -56,8 +58,8 @@ chmod 644 *
 mkdir -p $PKG/boot
 cp -a \
   bootcode.bin loader.bin \
-  $CWD/README.initrd \
   $PKG/boot
+zcat $CWD/README.initrd.gz > $PKG/boot/README.initrd
 
 # The memory allocation for the OS and GPU is set here (or by an env variable).
 # LINUXMEM must be set to 224 or 192 or 128.

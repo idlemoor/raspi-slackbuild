@@ -1,0 +1,5 @@
+Kernel modules SlackBuild for Raspberry Pi, lightly modified from the
+Slackware original.
+
+Before you run this SlackBuild the kernel modules must be ready in
+/lib/modules/${VERSION}/

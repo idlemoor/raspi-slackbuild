@@ -1,0 +1,6 @@
+Boot Firmware SlackBuild for Raspberry Pi
+
+Before you run this SlackBuild you must clone the Raspberry Pi 'firmware' git
+repository into a subdirectory named firmware:
+
+  git clone git://github.com/raspberrypi/firmware.git
