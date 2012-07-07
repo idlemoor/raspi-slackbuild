@@ -54,6 +54,10 @@ mkdir -p $PKG
 cd $CWD/linux
 make mrproper
 
+# Apply the 'swap: dont do discard if no discard option added' patch
+# (should speed up addswap)
+patch -p1 < $CWD/07fb30fa.patch
+
 # Package names & versions conform with Slackware/ARMedslack as follows:
 #   kernel_raspi has an underscore, but kernel-modules-raspi has dashes
 #   kernel_raspi version is e.g. 3.1.9_g6789abc
