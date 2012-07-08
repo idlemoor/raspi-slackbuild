@@ -70,7 +70,7 @@ fi
 #   kernel-modules-FFFF version is e.g. 3.1.9_FFFF_g6789abc
 # (we can drop the _g6789abc when upstream stabilises)
 
-cat $CWD/config-$FLAVOUR.in > .config
+cat $CWD/config-$FLAVOUR > .config
 
 MYVER=${MYVER:-g$(git log --format='%h' -n 1)}
 
@@ -82,7 +82,7 @@ rm $TMP/versionvars
 KNLVER="${VERSION}.${PATCHLEVEL}.${SUBLEVEL}${EXTRAVERSION}-${FLAVOUR}-${MYVER}"
 PKGVER=$(echo "$KNLVER" | tr - _)
 
-make Image $NUMJOBS LOCALVERSION="-$FLAVOUR-$VERSION"
+make Image $NUMJOBS LOCALVERSION="-$FLAVOUR-$MYVER"
 
 mkdir -p $PKG/boot
 # It's no longer necessary to wrap the Image, but apparently zImage isn't reliable.
@@ -116,7 +116,7 @@ cd $PKG
 # Prepare and install the modules.  The kernel-modules SlackBuild traditionally
 # just picks them up from the running system.
 cd $CWD/linux
-make modules $NUMJOBS LOCALVERSION="-$FLAVOUR-$VERSION"
+make modules $NUMJOBS LOCALVERSION="-$FLAVOUR-$MYVER"
 make modules_install
 
 # Lie about where the source is ;-)

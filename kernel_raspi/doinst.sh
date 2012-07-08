@@ -12,15 +12,15 @@ config() {
 }
 
 # Start with a wild guess
-rootdev='mmcblk0p2'
+rootdev='mmcblk0p3'
 if [ -L dev/root ]; then
   rootdev=/dev/$(readlink dev/root)
 elif [ -f /tag/README ]; then
   rootdev=$(awk '{if ($2=="/mnt") print $1}' /proc/mounts)
 elif [ -f proc/partitions ]; then
   # even wilder guesses :-(
-  if grep -q mmcblk0p2 proc/partitions; then
-    rootdev=/dev/mmcblk0p2
+  if grep -q mmcblk0p3 proc/partitions; then
+    rootdev=/dev/mmcblk0p3
   elif grep -q mmcblk0p5 proc/partitions; then
     rootdev=/dev/mmcblk0p5
   fi
