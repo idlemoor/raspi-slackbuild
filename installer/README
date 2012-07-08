@@ -1,0 +1,9 @@
+Run this script with a dirty kernel tree after building the kernel & modules,
+and don't mess with the .config.  Otherwise it'll want to rebuild the modules
+as well as the Image, and then you're back at step 1 :-)
+
+You will need:
+  * A dirty kernel tree in the directory '../kernel_raspi/linux'
+  * initrd-versatile.img, probably as a symlink to your armedslack-current
+    tree (it's in armedslack-current/isolinux)
+  * 'Extra' packages in $OUTPUT

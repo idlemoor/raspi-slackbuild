@@ -1,0 +1,154 @@
+#!/bin/sh
+
+# installer.SlackBuild
+# Build a Raspberry Pi installer image
+#
+# Copyright 2012 David Spencer, Baildon, West Yorkshire, U.K.
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+#------------------------------------------------------------------------------
+#
+# Run this script with a dirty kernel tree after building the kernel & modules,
+# and don't mess with the .config.  Otherwise it'll want to rebuild the modules
+# as well as the Image, and then you're back at step 1 :-)
+#
+# You will need:
+#   * A dirty kernel tree in the directory '../kernel_raspi/linux'
+#   * initrd-versatile.img, probably as a symlink to your armedslack-current
+#     tree (it's in armedslack-current/isolinux)
+#   * 'Extra' packages in $OUTPUT
+#
+#------------------------------------------------------------------------------
+
+TMP=${TMP:-/tmp}
+OUTPUT=${OUTPUT:-/tmp}
+
+IMAGE=$OUTPUT/raspi-slack-installer_$(date '+%d%b%y').img
+
+CWD=$(pwd)
+
+set -e
+
+#------------------------------------------------------------------------------
+# (0) Extract the installer tree from the upstream initrd
+
+rm -rf $TMP/initrd-tree
+mkdir -p $TMP/initrd-tree
+cd $TMP/initrd-tree
+zcat $CWD/initrd-versatile.img | cpio -iv
+
+#------------------------------------------------------------------------------
+# (1) Add raspi device nodes (maybe not needed -- to be checked)
+
+cd $TMP/initrd-tree/
+tar xvf $CWD/../raspi-devs/_devs.tar.xz
+
+#------------------------------------------------------------------------------
+# (2) Add README and extras to the installer tree
+
+cat $CWD/README.installer > $TMP/initrd-tree/README
+
+mkdir -p $TMP/initrd-tree/raspi-extras
+cp -a -v \
+  $OUTPUT/raspi-*.t?z \
+  $OUTPUT/kernel*.t?z \
+  $TMP/initrd-tree/raspi-extras
+
+#------------------------------------------------------------------------------
+# (3) Add kernel modules to the installer tree
+
+# Remove the versatile modules
+# (it might be helpful to qemu users to keep them, but they're just too big)
+rm -rf $TMP/initrd-tree/lib/modules/*
+
+cd $CWD/../kernel_raspi/linux
+make modules_install INSTALL_MOD_PATH=$TMP/initrd-tree LOCALVERSION='-raspi-installer'
+
+#------------------------------------------------------------------------------
+# (4) Build the installer tree into a new kernel image
+
+cd $CWD/../kernel_raspi/linux
+# Set kernel config for embedded initrd
+patch --fuzz=3 -p1 <$CWD/initrd-config.patch
+make Image LOCALVERSION="-raspi-installer"
+
+#------------------------------------------------------------------------------
+# (5) Take an empty image and format it
+
+rm -f $IMAGE
+dd if=/dev/zero of=$IMAGE bs=1024 count=1900000
+parted -s --align minimal $IMAGE \
+  mklabel msdos \
+  mkpart primary fat32 0M 50M \
+  mkpart primary linux-swap 50M 450M \
+  mkpart primary ext2 450M 1945M
+
+mdadm --build --force raspimg --level linear --raid-devices 1 $(losetup -f --show $IMAGE)
+
+mkdosfs -I /dev/md/raspimg1
+mkswap  /dev/md/raspimg2
+mkfs -t ext4 -j /dev/md/raspimg3
+
+#------------------------------------------------------------------------------
+# (6) Add the boot files to p1
+
+mkdir -p $TMP/installer/mnt
+mount -t vfat /dev/md/raspimg1 $TMP/installer/mnt
+
+rm -rf $TMP/installer/fwtemp
+mkdir -p $TMP/installer/fwtemp
+cd $TMP/installer/fwtemp
+explodepkg $OUTPUT/raspi-boot-*.t?z
+
+cp \
+  boot/bootcode.bin boot/loader.bin boot/start.elf boot/config.txt \
+  usr/doc/raspi-boot-*/LICENCE.broadcom \
+  $TMP/installer/mnt
+cp \
+  $CWD/arch/arm/boot/Image \
+  $TMP/installer/mnt/kernel.img 
+cat $CWD/README.installer > $TMP/installer/mnt/README
+
+# Grab kernel command line from kernel config.  'root=' doesn't matter.
+grep 'CONFIG_CMDLINE=' $CWD/../kernel_raspi/linux/.config | \
+  sed -e 's/CONFIG_CMDLINE="//' -e 's/"$//' \
+  > $PKG/boot/cmdline.txt
+
+KVER="$(cd $CWD/../kernel_raspi/linux; git log --format='%h' -n 1)"
+BVER="$(cd $CWD/../raspi-boot/firmware; git log --format='%h' -n 1)"
+
+cat $TMP/initrd-tree/.installer-version     > $PKG/boot/version.txt
+echo "Raspberry Pi:"                       >> $PKG/boot/version.txt
+echo "-------------"                       >> $PKG/boot/version.txt
+echo "Kernel git rev.......: $KVER"        >> $PKG/boot/version.txt
+echo "Boot fw git rev......: $BVER"        >> $PKG/boot/version.txt
+echo "Build host...........: $(uname -a)"  >> $PKG/boot/version.txt
+echo "Build date...........: $(date)"      >> $PKG/boot/version.txt
+
+#------------------------------------------------------------------------------
+# (7) Compress and do a checksum
+
+umount $TMP/installer/mnt
+xz $IMAGE
+sha1sum $IMAGE.xz > $IMAGE.xz.sha1
+
+#------------------------------------------------------------------------------
+
+exit 0

@@ -1,0 +1,52 @@
+This is the Slackware ARM Installer, modified to boot on the Raspberry Pi.
+Please follow these steps to perform your Slackware installation.
+
+(1) On a suitable host system, copy the image to an SD card
+
+  xz -dc raspi-slack-installer_30Jun12.img | dd of=[device] bs=512
+
+where [device] is the name of your SD device on the host system, for example
+/dev/sdb. You will need at least a 2Gb card. A full installation will need
+an 8Gb card.
+
+(2) Put the SD card in your Raspberry Pi and power it up.
+
+(3) Follow the familiar Slackware ARM Installer instructions. After logging
+in as root, but before running setup:
+
+  - Set the date and time, using the command 'date MMDDHHMM2012', for example
+  date 062412002012
+
+  - Repartition your SD card with fdisk or cfdisk. Note that your SD card is
+  identified as /dev/mmcblk0 (not /dev/sda) and the partitions will be
+  /dev/mmcblk0p1, mmcblk0p2 etc.  The SD card is already set up with a boot
+  partition (mmcblk0p1), a preformatted swap partition (mmcblk0p2), and a
+  small preformatted empty partition for root (mmcblk0p3).  You can most
+  easily maximise the size of your root partition by deleting it right now
+  and recreating it to take up all the free space on your SD card.
+
+(4) Run 'setup' as usual. Your SOURCE can be on the network or on a USB
+device.
+
+(5) Some steps in the installer will be quite slow, particularly formatting
+the root partition as ext4, and processing the list of Slackware packages
+from PACKAGES.TXT.  This is normal.
+
+(6) When you have finished setup, choose 'No' (do not reboot) and drop to
+the command prompt.
+
+(7) If you installed kernels for other systems (in a 'full' install) you can
+save disk space by removing them as follows:
+
+  ROOT=/mnt removepkg \
+    kernel_kirkwood kernel-modules-kirkwood \
+    kernel_tegra kernel-modules-tegra \
+    kernel_versatile kernel-modules-versatile
+
+(8) Mount the boot partition and install the Raspberry Pi extra packages
+as follows:
+
+  mount -t vfat /dev/mmcblk0p1 /mnt/boot
+  ROOT=/mnt installpkg /raspi-extra/kernel* /raspi-extra/raspi*
+
+(9) Now you can reboot your new system :-)
