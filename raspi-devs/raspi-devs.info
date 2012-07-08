@@ -1,5 +1,5 @@
 PRGNAM="raspi-devs"
-VERSION="13.37"
+VERSION="1.0"
 HOMEPAGE="http://daves-slackbuilds.comlu.com/slackbuilds/raspi"
 DOWNLOAD="http://daves-slackbuilds.comlu.com/slackbuilds/raspi/raspi-devs/_devs.tar.xz"
 MD5SUM="2561818d9e3ba1e34641c5229876fc01"

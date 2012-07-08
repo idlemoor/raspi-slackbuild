@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Device nodes for Raspberry Pi
-# David Spencer <baildon.research@googlemail.com> 16 June 2012
+# David Spencer <baildon.research@googlemail.com> 8 July 2012
 # The most appropriate documentation for this package is a script :-)
 
 mknod -m 660 mmcblk0    b 179  0
@@ -12,14 +12,6 @@ mknod -m 660 mmcblk0p4  b 179  4
 mknod -m 660 mmcblk0p5  b 179  5
 mknod -m 660 mmcblk0p6  b 179  6
 mknod -m 660 mmcblk0p7  b 179  7
-mknod -m 660 mmcblk0p8  b 179  8
-mknod -m 660 mmcblk0p9  b 179  9
-mknod -m 660 mmcblk0p10 b 179 10
-mknod -m 660 mmcblk0p11 b 179 11
-mknod -m 660 mmcblk0p12 b 179 12
-mknod -m 660 mmcblk0p13 b 179 13
-mknod -m 660 mmcblk0p14 b 179 14
-mknod -m 660 mmcblk0p15 b 179 15
 chown root:disk mmcblk*
 
 mknod -m 600 usbdev1.1  c 189  0
