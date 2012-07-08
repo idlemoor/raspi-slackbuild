@@ -33,7 +33,7 @@
 #------------------------------------------------------------------------------
 
 PRGNAM=raspi-boot
-# Version will be taken from firmware's git rev
+VERSION=${VERSION:-$(date '+%Y%m%d')}
 BUILD=${BUILD:-1}
 TAG=${TAG:-}
 
@@ -50,7 +50,7 @@ rm -rf $PKG
 mkdir -p $PKG
 
 cd $CWD/firmware/boot
-VERSION=${VERSION:-g$(git log --format='%h' -n 1)}
+GITREV=$(git log --format='%h' -n 1)
 
 chown root:root *
 chmod 644 *
@@ -91,8 +91,13 @@ cat $CWD/slack-desc > $PKG/install/slack-desc
 cat $CWD/doinst.sh > $PKG/install/doinst.sh
 
 # Add version stamp into /boot
-echo "$PRGNAM-$VERSION-$ARCH-$BUILD$TAG $(date -u '+%F %T')" \
-  > $PKG/boot/version-$PRGNAM.txt
+# Add version stamp into /boot
+echo "Package: $PRGNAM-$VERSION-$ARCH-$BUILD$TAG" \
+  >  $PKG/boot/version-$PRGNAM.txt
+echo "Build date: $(date -u '+%F %T')" \
+  >> $PKG/boot/version-$PRGNAM.txt
+echo "Git revision: $GITREV" \
+  >> $PKG/boot/version-$PRGNAM.txt
 
 cd $PKG
 /sbin/makepkg -l y -c n $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.${PKGTYPE:-tgz}

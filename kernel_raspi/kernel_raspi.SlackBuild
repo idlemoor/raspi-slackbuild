@@ -36,8 +36,8 @@
 FLAVOUR=raspi
 PRGNAM=kernel_$FLAVOUR
 
-# If not set in the environment, MYVER will be calculated later from git rev
-MYVER=${VERSION:-}
+# If not set in the environment, MYVER will be set from today's date
+MYVER=${VERSION:-$(date '+%Y%m%d')}
 BUILD=${BUILD:-1}
 TAG=${TAG:-}
 
@@ -64,25 +64,19 @@ if [ -d $CWD/patches/ ]; then
   done
 fi
 
-# Package names & versions conform with Slackware/ARMedslack as follows:
-#   kernel_FFFF has an underscore, but kernel-modules-FFFF has dashes
-#   kernel_FFFF version is e.g. 3.1.9_g6789abc
-#   kernel-modules-FFFF version is e.g. 3.1.9_FFFF_g6789abc
-# (we can drop the _g6789abc when upstream stabilises)
-
 cat $CWD/config-$FLAVOUR > .config
 
-MYVER=${MYVER:-g$(git log --format='%h' -n 1)}
+GITREV=$(git log --format='%h' -n 1)
 
-make silentoldconfig LOCALVERSION="-$FLAVOUR-$MYVER"
+make silentoldconfig LOCALVERSION="-$MYVER"
 
 head -4 Makefile | sed 's/ *= */=/' > $TMP/versionvars
 . $TMP/versionvars
 rm $TMP/versionvars
-KNLVER="${VERSION}.${PATCHLEVEL}.${SUBLEVEL}${EXTRAVERSION}-${FLAVOUR}-${MYVER}"
+KNLVER="${VERSION}.${PATCHLEVEL}.${SUBLEVEL}${EXTRAVERSION}-${MYVER}"
 PKGVER=$(echo "$KNLVER" | tr - _)
 
-make Image $NUMJOBS LOCALVERSION="-$FLAVOUR-$MYVER"
+make Image $NUMJOBS LOCALVERSION="-$MYVER"
 
 mkdir -p $PKG/boot
 # It's no longer necessary to wrap the Image, but apparently zImage isn't reliable.
@@ -105,8 +99,12 @@ cat $CWD/slack-desc > $PKG/install/slack-desc
 cat $CWD/doinst.sh > $PKG/install/doinst.sh
 
 # Add version stamp into /boot
-echo "$PRGNAM-$PKGVER-$KNLARCH-$BUILD$TAG $(date -u '+%F %T')" \
-  > $PKG/boot/version-$PRGNAM.txt
+echo "Package: $PRGNAM-$PKGVER-$KNLARCH-$BUILD$TAG" \
+  >  $PKG/boot/version-$PRGNAM.txt
+echo "Build date: $(date -u '+%F %T')" \
+  >> $PKG/boot/version-$PRGNAM.txt
+echo "Git revision: $GITREV" \
+  >> $PKG/boot/version-$PRGNAM.txt
 
 cd $PKG
 /sbin/makepkg -l y -c n $OUTPUT/$PRGNAM-$PKGVER-$KNLARCH-$BUILD$TAG.${PKGTYPE:-tgz}
@@ -116,7 +114,7 @@ cd $PKG
 # Prepare and install the modules.  The kernel-modules SlackBuild traditionally
 # just picks them up from the running system.
 cd $CWD/linux
-make modules $NUMJOBS LOCALVERSION="-$FLAVOUR-$MYVER"
+make modules $NUMJOBS LOCALVERSION="-$MYVER"
 make modules_install
 
 # Lie about where the source is ;-)
