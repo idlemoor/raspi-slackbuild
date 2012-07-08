@@ -25,16 +25,20 @@
 
 #------------------------------------------------------------------------------
 #
-# This script will build the following packages:
+# This script will run the following SlackBuilds:
 #   raspi-boot
 #   raspi-devs
 #   raspi-hacks
 #   kernel_raspi
 #   kernel-modules-raspi
+#   installer
 #
-# Before running this script, kernel_raspi/linux and raspi-boot/firmware must contain these git repos:
-#   git clone https://github.com/raspberrypi/linux.git kernel_raspi/linux
-#   git clone https://github.com/raspberrypi/firmware.git raspi-boot/firmware
+# Before running this script, you must set up the following git repos:
+#
+#   git clone git://github.com/raspberrypi/linux.git \
+#             kernel_raspi/linux
+#   git clone git://github.com/raspberrypi/firmware.git \
+#             raspi-boot/firmware
 #
 #------------------------------------------------------------------------------
 
@@ -49,7 +53,10 @@ CWD=$(pwd)
 
 set -e
 
-for PKGNAM in raspi-boot raspi-devs raspi-hacks kernel_raspi ; do
+for PKGNAM in \
+  raspi-boot raspi-devs raspi-hacks \
+  kernel_raspi installer ; do
+
 # Note: kernel_raspi.SlackBuild will call kernel-modules-raspi.SlackBuild
 
   echo "########################################"

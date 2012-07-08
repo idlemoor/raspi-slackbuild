@@ -6,6 +6,7 @@ This script will run the following SlackBuilds:
   raspi-hacks
   kernel_raspi
   kernel-modules-raspi
+  installer
 
 Before running this script, you must set up the following git repos:
 
