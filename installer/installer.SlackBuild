@@ -27,7 +27,7 @@
 #
 # Run this script with a dirty kernel tree after building the kernel & modules,
 # and don't mess with the .config.  Otherwise it'll want to rebuild the modules
-# as well as the Image, and then you're back at step 1 :-)
+# as well as the Image :-(
 #
 # You will need:
 #   * A dirty kernel tree in the directory '../kernel_raspi/linux'
@@ -79,28 +79,36 @@ cp -a -v \
 rm -rf $TMP/initrd-tree/lib/modules/*
 
 cd $CWD/../kernel_raspi/linux
-make modules_install INSTALL_MOD_PATH=$TMP/initrd-tree LOCALVERSION='-raspi-installer'
+make modules_install INSTALL_MOD_PATH=$TMP/initrd-tree
 
 #------------------------------------------------------------------------------
 # (4) Build the installer tree into a new kernel image
 
 cd $CWD/../kernel_raspi/linux
+
 # Set kernel config for embedded initrd
-patch --fuzz=3 -p1 <$CWD/initrd-config.patch
-make Image LOCALVERSION="-raspi-installer"
+if ! fgrep 'CONFIG_INITRAMFS_SOURCE="/tmp/initrd-tree"' .config ; then
+  patch --fuzz=3 -p1 <$CWD/initrd-config.patch
+fi
+make Image
 
 #------------------------------------------------------------------------------
 # (5) Take an empty image and format it
 
 rm -f $IMAGE
-dd if=/dev/zero of=$IMAGE bs=1024 count=1900000
-parted -s --align minimal $IMAGE \
+echo "Formatting $IMAGE"
+dd if=/dev/zero of=$IMAGE bs=65536 count=30000
+
+# parted's label will have flash-friendly geometry: 4heads/32sect/30000cyl
+parted -s --align cylinder $IMAGE \
   mklabel msdos \
   mkpart primary fat32 0M 50M \
   mkpart primary linux-swap 50M 450M \
-  mkpart primary ext2 450M 1945M
+  mkpart primary ext2 450M 1966M
 
 mdadm --build --force raspimg --level linear --raid-devices 1 $(losetup -f --show $IMAGE)
+# takes a few secs to ready /dev/md/* apparently
+sleep 5
 
 mkdosfs -I /dev/md/raspimg1
 mkswap  /dev/md/raspimg2
@@ -118,27 +126,28 @@ cd $TMP/installer/fwtemp
 explodepkg $OUTPUT/raspi-boot-*.t?z
 
 cp \
-  boot/bootcode.bin boot/loader.bin boot/start.elf boot/config.txt \
+  boot/bootcode.bin boot/loader.bin boot/start.elf \
   usr/doc/raspi-boot-*/LICENCE.broadcom \
   $TMP/installer/mnt
+cat boot/config.txt.new   > $TMP/installer/mnt/config.txt
+cat $CWD/README.installer > $TMP/installer/mnt/README
 cp \
   $CWD/arch/arm/boot/Image \
-  $TMP/installer/mnt/kernel.img 
-cat $CWD/README.installer > $TMP/installer/mnt/README
+  $TMP/installer/mnt/kernel.img
 
 # Grab kernel command line from kernel config.  'root=' doesn't matter.
 grep 'CONFIG_CMDLINE=' $CWD/../kernel_raspi/linux/.config | \
   sed -e 's/CONFIG_CMDLINE="//' -e 's/"$//' \
   > $PKG/boot/cmdline.txt
 
-KVER="$(cd $CWD/../kernel_raspi/linux; git log --format='%h' -n 1)"
-BVER="$(cd $CWD/../raspi-boot/firmware; git log --format='%h' -n 1)"
+KREV="$(cd $CWD/../kernel_raspi/linux; git log --format='%h' -n 1)"
+BREV="$(cd $CWD/../raspi-boot/firmware; git log --format='%h' -n 1)"
 
 cat $TMP/initrd-tree/.installer-version     > $PKG/boot/version.txt
 echo "Raspberry Pi:"                       >> $PKG/boot/version.txt
 echo "-------------"                       >> $PKG/boot/version.txt
-echo "Kernel git rev.......: $KVER"        >> $PKG/boot/version.txt
-echo "Boot fw git rev......: $BVER"        >> $PKG/boot/version.txt
+echo "Kernel git rev.......: $KREV"        >> $PKG/boot/version.txt
+echo "Boot fw git rev......: $BREV"        >> $PKG/boot/version.txt
 echo "Build host...........: $(uname -a)"  >> $PKG/boot/version.txt
 echo "Build date...........: $(date)"      >> $PKG/boot/version.txt
 

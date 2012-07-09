@@ -78,6 +78,7 @@ cp -a \
 
 # Install as .new even though it's not in /etc
 cat <<EOF > $PKG/boot/config.txt.new
+# For information about this file, see http://elinux.org/RPi_config.txt
 disable_overscan=1
 EOF
 
