@@ -57,9 +57,10 @@ chmod 644 *
 
 mkdir -p $PKG/boot
 cp -a \
-  bootcode.bin loader.bin \
+  bootcode.bin loader.bin LICENCE.broadcom \
   $PKG/boot
 zcat $CWD/README.initrd.gz > $PKG/boot/README.initrd
+zcat $CWD/README.boot.gz   > $PKG/boot/README
 
 # The memory allocation for the OS and GPU is set here (or by an env variable).
 # LINUXMEM must be set to 224 or 192 or 128.
@@ -91,7 +92,6 @@ mkdir -p $PKG/install
 cat $CWD/slack-desc > $PKG/install/slack-desc
 cat $CWD/doinst.sh > $PKG/install/doinst.sh
 
-# Add version stamp into /boot
 # Add version stamp into /boot
 echo "Package: $PRGNAM-$VERSION-$ARCH-$BUILD$TAG" \
   >  $PKG/boot/version-$PRGNAM.txt
