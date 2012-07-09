@@ -91,7 +91,7 @@ cat .config > $PKG/usr/doc/$PRGNAM-$PKGVER/config
 # Install as .new even though it's not in /etc
 # Root device will be filled in by doinst.sh
 grep 'CONFIG_CMDLINE=' .config | \
-  sed -e 's/CONFIG_CMDLINE="//' -e 's/"$//' -e 's:/root=/dev/mmcblk0p[0-7]:root=@ROOTDEV@:' \
+  sed -e 's/CONFIG_CMDLINE="//' -e 's/"$//' -e 's:root=/dev/mmcblk0p[0-7]:root=@ROOTDEV@:' \
   > $PKG/boot/cmdline.txt.new
 
 mkdir -p $PKG/install
