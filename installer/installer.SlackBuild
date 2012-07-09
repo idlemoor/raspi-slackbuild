@@ -61,15 +61,15 @@ cd $TMP/initrd-tree/
 tar xvf $CWD/../raspi-devs/_devs.tar.xz
 
 #------------------------------------------------------------------------------
-# (2) Add README and extras to the installer tree
+# (2) Add README and raspi-extra to the installer tree
 
 cat $CWD/README.installer > $TMP/initrd-tree/README
 
-mkdir -p $TMP/initrd-tree/raspi-extras
+mkdir -p $TMP/initrd-tree/raspi-extra
 cp -a -v \
   $OUTPUT/raspi-*.t?z \
   $OUTPUT/kernel*.t?z \
-  $TMP/initrd-tree/raspi-extras
+  $TMP/initrd-tree/raspi-extra
 
 #------------------------------------------------------------------------------
 # (3) Add kernel modules to the installer tree
@@ -111,7 +111,7 @@ mdadm --build --force raspimg --level linear --raid-devices 1 $(losetup -f --sho
 sleep 5
 
 mkdosfs -I /dev/md/raspimg1
-mkswap  /dev/md/raspimg2
+mkswap /dev/md/raspimg2
 mkfs -t ext4 -j /dev/md/raspimg3
 
 #------------------------------------------------------------------------------
