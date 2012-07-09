@@ -37,10 +37,9 @@
 #
 #------------------------------------------------------------------------------
 
-TMP=${TMP:-/tmp}
+TMP=${TMP:-/tmp/installer}
 OUTPUT=${OUTPUT:-/tmp}
-
-IMAGE=$OUTPUT/raspi-slack-installer_$(date '+%d%b%y').img
+IMAGE=raspi-slack-installer_$(date '+%d%b%y').img
 
 CWD=$(pwd)
 
@@ -49,37 +48,38 @@ set -e
 #------------------------------------------------------------------------------
 # (0) Extract the installer tree from the upstream initrd
 
-rm -rf $TMP/initrd-tree
-mkdir -p $TMP/initrd-tree
-cd $TMP/initrd-tree
+# Use /tmp not $TMP because /tmp/initrd-tree is hardcoded in the kernel config
+rm -rf /tmp/initrd-tree
+mkdir -p /tmp/initrd-tree
+cd /tmp/initrd-tree
 zcat $CWD/initrd-versatile.img | cpio -iv
 
 #------------------------------------------------------------------------------
 # (1) Add raspi device nodes (maybe not needed -- to be checked)
 
-cd $TMP/initrd-tree/
+cd /tmp/initrd-tree/
 tar xvf $CWD/../raspi-devs/_devs.tar.xz
 
 #------------------------------------------------------------------------------
 # (2) Add README and raspi-extra to the installer tree
 
-cat $CWD/README.installer > $TMP/initrd-tree/README
+cat $CWD/README.installer > /tmp/initrd-tree/README
 
-mkdir -p $TMP/initrd-tree/raspi-extra
+mkdir -p /tmp/initrd-tree/raspi-extra
 cp -a -v \
   $OUTPUT/raspi-*.t?z \
   $OUTPUT/kernel*.t?z \
-  $TMP/initrd-tree/raspi-extra
+  /tmp/initrd-tree/raspi-extra
 
 #------------------------------------------------------------------------------
 # (3) Add kernel modules to the installer tree
 
 # Remove the versatile modules
 # (it might be helpful to qemu users to keep them, but they're just too big)
-rm -rf $TMP/initrd-tree/lib/modules/*
+rm -rf /tmp/initrd-tree/lib/modules/*
 
 cd $CWD/../kernel_raspi/linux
-make modules_install INSTALL_MOD_PATH=$TMP/initrd-tree
+make modules_install INSTALL_MOD_PATH=/tmp/initrd-tree
 
 #------------------------------------------------------------------------------
 # (4) Build the installer tree into a new kernel image
@@ -87,7 +87,7 @@ make modules_install INSTALL_MOD_PATH=$TMP/initrd-tree
 cd $CWD/../kernel_raspi/linux
 
 # Set kernel config for embedded initrd
-if ! fgrep 'CONFIG_INITRAMFS_SOURCE="/tmp/initrd-tree"' .config ; then
+if ! fgrep -q 'CONFIG_INITRAMFS_SOURCE="/tmp/initrd-tree"' .config ; then
   patch --fuzz=3 -p1 <$CWD/initrd-config.patch
 fi
 make Image
@@ -95,68 +95,87 @@ make Image
 #------------------------------------------------------------------------------
 # (5) Take an empty image and format it
 
-rm -f $IMAGE
-echo "Formatting $IMAGE"
-dd if=/dev/zero of=$IMAGE bs=65536 count=30000
+rm -f $TMP/$IMAGE
+echo "Formatting $TMP/$IMAGE"
+dd if=/dev/zero of=$TMP/$IMAGE bs=65536 count=30000
 
 # parted's label will have flash-friendly geometry: 4heads/32sect/30000cyl
-parted -s --align cylinder $IMAGE \
+# The numbers below are pragmatically determined ;-)
+parted -s --align cylinder $TMP/$IMAGE \
   mklabel msdos \
   mkpart primary fat32 0M 50M \
   mkpart primary linux-swap 50M 450M \
   mkpart primary ext2 450M 1966M
 
-mdadm --build --force raspimg --level linear --raid-devices 1 $(losetup -f --show $IMAGE)
-# takes a few secs to ready /dev/md/* apparently
+LOOPDEV=$(losetup -f --show $TMP/$IMAGE)
+mdadm --build --force raspimg --level linear --raid-devices 1 $LOOPDEV
+# It takes a few secs to ready /dev/md/* apparently
 sleep 5
 
 mkdosfs -I /dev/md/raspimg1
 mkswap /dev/md/raspimg2
 mkfs -t ext4 -j /dev/md/raspimg3
 
+# Save the empty SD card image as a useful by-product.
+# (Very time consuming, so only do this if needed.)
+EMPTY=raspi-empty-sdcard.img
+if [ ! -f $OUTPUT/$EMPTY.xz ]; then
+  echo "Compressing image to $OUTPUT/$EMPTY.xz"
+  xz -v < $TMP/$IMAGE > $OUTPUT/$EMPTY.xz
+  sha1sum $OUTPUT/$EMPTY.xz > $OUTPUT/$EMPTY.xz.sha1
+fi
+
 #------------------------------------------------------------------------------
-# (6) Add the boot files to p1
+# (6) Copy everything onto image partition 1
 
-mkdir -p $TMP/installer/mnt
-mount -t vfat /dev/md/raspimg1 $TMP/installer/mnt
+mkdir -p $TMP/mnt
+mount -t vfat /dev/md/raspimg1 $TMP/mnt
 
-rm -rf $TMP/installer/fwtemp
-mkdir -p $TMP/installer/fwtemp
-cd $TMP/installer/fwtemp
+# Get the boot firmware
+rm -rf $TMP/firmware
+mkdir -p $TMP/firmware
+cd $TMP/firmware
 explodepkg $OUTPUT/raspi-boot-*.t?z
+cp -v \
+  boot/bootcode.bin boot/loader.bin boot/start.elf boot/LICENCE.broadcom \
+  $TMP/mnt
+cat boot/config.txt.new > $TMP/mnt/config.txt
 
-cp \
-  boot/bootcode.bin boot/loader.bin boot/start.elf \
-  usr/doc/raspi-boot-*/LICENCE.broadcom \
-  $TMP/installer/mnt
-cat boot/config.txt.new   > $TMP/installer/mnt/config.txt
-cat $CWD/README.installer > $TMP/installer/mnt/README
-cp \
-  $CWD/arch/arm/boot/Image \
-  $TMP/installer/mnt/kernel.img
-
+# Get the kernel
+cp -v \
+  $CWD/../kernel_raspi/linux/arch/arm/boot/Image \
+  $TMP/mnt/kernel.img
 # Grab kernel command line from kernel config.  'root=' doesn't matter.
 grep 'CONFIG_CMDLINE=' $CWD/../kernel_raspi/linux/.config | \
   sed -e 's/CONFIG_CMDLINE="//' -e 's/"$//' \
-  > $PKG/boot/cmdline.txt
+  > $TMP/mnt/cmdline.txt
 
+# Assemble the README
+cat $CWD/README.installer                   > $TMP/mnt/README
+echo ""                                    >> $TMP/mnt/README
+echo ""                                    >> $TMP/mnt/README
+cat /tmp/initrd-tree/.installer-version    >> $TMP/mnt/README
+echo "Raspberry Pi:"                       >> $TMP/mnt/README
+echo "-------------"                       >> $TMP/mnt/README
 KREV="$(cd $CWD/../kernel_raspi/linux; git log --format='%h' -n 1)"
+echo "Kernel git rev.......: $KREV"        >> $TMP/mnt/README
 BREV="$(cd $CWD/../raspi-boot/firmware; git log --format='%h' -n 1)"
-
-cat $TMP/initrd-tree/.installer-version     > $PKG/boot/version.txt
-echo "Raspberry Pi:"                       >> $PKG/boot/version.txt
-echo "-------------"                       >> $PKG/boot/version.txt
-echo "Kernel git rev.......: $KREV"        >> $PKG/boot/version.txt
-echo "Boot fw git rev......: $BREV"        >> $PKG/boot/version.txt
-echo "Build host...........: $(uname -a)"  >> $PKG/boot/version.txt
-echo "Build date...........: $(date)"      >> $PKG/boot/version.txt
+echo "Boot fw git rev......: $BREV"        >> $TMP/mnt/README
+echo "Build host...........: $(uname -a)"  >> $TMP/mnt/README
+echo "Build date...........: $(date)"      >> $TMP/mnt/README
 
 #------------------------------------------------------------------------------
 # (7) Compress and do a checksum
 
-umount $TMP/installer/mnt
-xz $IMAGE
-sha1sum $IMAGE.xz > $IMAGE.xz.sha1
+umount -v $TMP/mnt
+mdadm --stop /dev/md/raspimg
+losetup -d $LOOPDEV
+
+echo "Compressing image to $OUTPUT/$IMAGE.xz"
+xz -v < $TMP/$IMAGE > $OUTPUT/$IMAGE.xz
+sha1sum $OUTPUT/$IMAGE.xz > $OUTPUT/$IMAGE.xz.sha1
+
+rm $TMP/$IMAGE
 
 #------------------------------------------------------------------------------
 
