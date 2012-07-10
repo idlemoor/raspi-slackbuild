@@ -1,0 +1,369 @@
+#!/bin/sh
+# This is 'probe', a wrapper for using fdisk to gather drive info for
+# the Slackware setup scripts.  I hate to bounce this much garbage through
+# a tmpdir, but it looks like large variables can make ash crash...
+
+# Many thanks to Vincent Rivellino for contributing the patches to support
+# Mylex and Compaq RAID controllers.
+
+TMP=/var/log/setup/tmp
+rm -f $TMP/SeTfdisk
+
+# listide major minor hd1 hd2 (2 base devs for major)
+list_ide() {
+  if [ "$2" = "0" ]; then
+    fdisk -l /dev/$3 >> $TMP/SeTfdisk
+  elif [ "$2" = "64" ]; then
+    fdisk -l /dev/$4 >> $TMP/SeTfdisk
+  fi
+}
+
+list_scsi() {
+  # find drive # 0 - 15
+  DRV=`expr $1 / 16`
+  NUM=`expr $1 % 16`
+  if [ ! "$NUM" = "0" ]; then
+    return
+  fi
+  if [ "$DRV" = "0" ]; then
+    fdisk -l /dev/sda >> $TMP/SeTfdisk
+  elif [ "$DRV" = "1" ]; then
+    fdisk -l /dev/sdb >> $TMP/SeTfdisk
+  elif [ "$DRV" = "2" ]; then
+    fdisk -l /dev/sdc >> $TMP/SeTfdisk
+  elif [ "$DRV" = "3" ]; then
+    fdisk -l /dev/sdd >> $TMP/SeTfdisk
+  elif [ "$DRV" = "4" ]; then
+    fdisk -l /dev/sde >> $TMP/SeTfdisk
+  elif [ "$DRV" = "5" ]; then
+    fdisk -l /dev/sdf >> $TMP/SeTfdisk
+  elif [ "$DRV" = "6" ]; then
+    fdisk -l /dev/sdg >> $TMP/SeTfdisk
+  elif [ "$DRV" = "7" ]; then
+    fdisk -l /dev/sdh >> $TMP/SeTfdisk
+  elif [ "$DRV" = "8" ]; then
+    fdisk -l /dev/sdi >> $TMP/SeTfdisk
+  elif [ "$DRV" = "9" ]; then
+    fdisk -l /dev/sdj >> $TMP/SeTfdisk
+  elif [ "$DRV" = "10" ]; then
+    fdisk -l /dev/sdk >> $TMP/SeTfdisk
+  elif [ "$DRV" = "11" ]; then
+    fdisk -l /dev/sdl >> $TMP/SeTfdisk
+  elif [ "$DRV" = "12" ]; then
+    fdisk -l /dev/sdm >> $TMP/SeTfdisk
+  elif [ "$DRV" = "13" ]; then
+    fdisk -l /dev/sdn >> $TMP/SeTfdisk
+  elif [ "$DRV" = "14" ]; then
+    fdisk -l /dev/sdo >> $TMP/SeTfdisk
+  elif [ "$DRV" = "15" ]; then
+    fdisk -l /dev/sdp >> $TMP/SeTfdisk
+  fi
+}
+
+# List Mylex RAID device
+list_rd() {
+  # find drive
+  DRV=`expr $2 / 8`
+  NUM=`expr $2 % 8`
+  if [ ! "$NUM" = "0" ]; then
+    return
+  fi
+  fdisk -l /dev/rd/c$1d$DRV >> $TMP/SeTfdisk
+  output_gpt_partitions /dev/rd/c$1d$DRV >> $TMP/SeTfdisk
+}
+
+# List Cpq SMART/2 RAID device
+list_ida() {
+  # find drive
+  DRV=`expr $2 / 16`
+  NUM=`expr $2 % 16`
+  if [ ! "$NUM" = "0" ]; then
+    return
+  fi
+  fdisk -l /dev/ida/c$1d$DRV >> $TMP/SeTfdisk
+  output_gpt_partitions /dev/ida/c$1d$DRV >> $TMP/SeTfdisk
+}
+
+list_cciss() {
+  # find drive
+  DRV=`expr $2 / 16`
+  NUM=`expr $2 % 16`
+  if [ ! "$NUM" = "0" ]; then
+    return
+  fi
+  fdisk -l /dev/cciss/c$1d$DRV >> $TMP/SeTfdisk
+  output_gpt_partitions /dev/cciss/c$1d$DRV >> $TMP/SeTfdisk
+}
+
+list_ataraid() {
+  # find drive
+  DRV=`expr $2 / 16`
+  NUM=`expr $2 % 16`
+  if [ "$NUM" = "0" ]; then
+     fdisk -l /dev/ataraid/d$DRV >> $TMP/SeTfdisk
+     output_gpt_partitions /dev/ataraid/d$DRV >> $TMP/SeTfdisk
+  else
+     return
+  fi
+}
+
+list_amiraid() {
+  # find drive
+  DRV=`expr $2 / 16`
+  NUM=`expr $2 % 16`
+  if [ "$NUM" = "0" ]; then
+     fdisk -l /dev/amiraid/ar$DRV >> $TMP/SeTfdisk
+     output_gpt_partitions /dev/amiraid/ar$DRV >> $TMP/SeTfdisk
+  else
+     return
+  fi
+}
+
+is_swap() {
+  HEADER=`dd if="$1" bs=1 skip=4086 count=10 2>/dev/null`
+  if [ "$HEADER" = "SWAPSPACE2" -o "$HEADER" = "SWAP_SPACE" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+list_md() {
+  if ( is_swap "/dev/$2" ); then TYPE="Linux swap"; else TYPE="Linux"; fi
+  echo "/dev/$2  1 2 $1 kk $TYPE" >> $TMP/SeTfdisk
+}
+
+list_lvm() {
+  lvscan 2>/dev/null | grep "ACTIVE" | while read line ; do
+    SMASHED_LINE=$line
+    if [ "$SMASHED_LINE" = "" ]; then
+      break;
+    fi
+    DEV=`echo $SMASHED_LINE | cut -f2 -d"'"`
+    SIZE=`lvdisplay $DEV -C --units k --noheadings --separator : | cut -f4 -d':'  | sed -e 's/^\([0-9]*\)[^0-9].*/\1/'`
+    TYPE="Linux"
+    if ( is_swap "$DEV" ); then TYPE="Linux swap"; fi
+    echo "$DEV  0  0  $SIZE  lv  $TYPE" >> $TMP/SeTfdisk
+  done
+}
+
+# List any volumes created by cryptsetup
+list_crypt() {
+  for i in $(ls /dev/mapper/); do
+    if cryptsetup status $i 2>/dev/null | grep "is active" 1>/dev/null ; then
+      DEV=$(cryptsetup status $i 2>/dev/null | grep "is active" | cut -f1 -d' ')
+      SIZE=$(fdisk -s $(cryptsetup status $i 2>/dev/null | grep "device:" | cut -f2 -d: | tr -d ' '))
+      echo "$DEV  0  0  $SIZE  lc  Linux" >> $TMP/SeTfdisk
+    fi
+  done
+}
+
+output_gpt_partitions() {
+# First, make sure the device is GPT:
+if fdisk -l $1 2> /dev/null | grep -wq GPT ; then 
+  unset output
+  # In the case of some RAID device like Mylex we will need to delimit the
+  # partition number.  We will set a partition delimiter variable P set
+  # either to an empty string (default) or the needed delimiter.
+  TESTRAID="$(echo $1 | cut -f 2 -d /)"
+  case "$TESTRAID" in
+  'amiraid' )
+    P="p"
+    ;;
+  'ataraid' )
+    P="p"
+    ;;
+  'cciss' )
+    P="p"
+    ;;
+  'ida' )
+    P="p"
+    ;;
+  'rd' )
+    P="p"
+    ;;
+  *)
+    P=""
+    ;;
+  esac
+  parted $1 unit b print | while read parse ; do
+    if [ ! -z $output ]; then
+      line=$parse
+      if [ ! "$(echo $line | cut -b1)" = "" ]; then
+        gptpartition=${1}${P}$(echo $line | cut -f 1 -d ' ')
+        gpttype="$(echo $line | cut -f 5 -d ' ')"
+        if ( is_swap $gptpartition ); then
+          fdisktype="Linux swap"
+        elif [ "$gpttype" = "msdos" ]; then
+          fdisktype="W95 FAT32"
+        elif [ "$gpttype" = "ntfs" ]; then
+          fdisktype="HPFS/NTFS"
+        elif echo $gpttype | grep -q hfs ; then
+          fdisktype="HFS+"
+        else
+          fdisktype=Linux
+        fi
+        gptstart="$(expr $(echo $line | cut -f 2 -d ' ' | tr -d B) / 1024)"
+        gptend="$(expr $(echo $line | cut -f 3 -d ' ' | tr -d B) / 1024)"
+        gptsize="$(expr $(echo $line | cut -f 4 -d ' ' | tr -d B) / 1024)"
+        echo $gptpartition $gptstart $gptend $gptsize gp $fdisktype
+      fi
+    fi
+    if echo $parse | grep -q "^Number" ; then
+      output=true
+    fi
+  done
+fi
+}
+
+list_scsi_gpt() {
+  # find drive # 0 - 15
+  DRV=`expr $1 / 16`
+  NUM=`expr $1 % 16`
+  if [ ! "$NUM" = "0" ]; then
+    return
+  fi
+  if [ "$DRV" = "0" ]; then
+    output_gpt_partitions /dev/sda
+  elif [ "$DRV" = "1" ]; then
+    output_gpt_partitions /dev/sdb
+  elif [ "$DRV" = "2" ]; then
+    output_gpt_partitions /dev/sdc
+  elif [ "$DRV" = "3" ]; then
+    output_gpt_partitions /dev/sdd
+  elif [ "$DRV" = "4" ]; then
+    output_gpt_partitions /dev/sde
+  elif [ "$DRV" = "5" ]; then
+    output_gpt_partitions /dev/sdf
+  elif [ "$DRV" = "6" ]; then
+    output_gpt_partitions /dev/sdg
+  elif [ "$DRV" = "7" ]; then
+    output_gpt_partitions /dev/sdh
+  elif [ "$DRV" = "8" ]; then
+    output_gpt_partitions /dev/sdi
+  elif [ "$DRV" = "9" ]; then
+    output_gpt_partitions /dev/sdj
+  elif [ "$DRV" = "10" ]; then
+    output_gpt_partitions /dev/sdk
+  elif [ "$DRV" = "11" ]; then
+    output_gpt_partitions /dev/sdl
+  elif [ "$DRV" = "12" ]; then
+    output_gpt_partitions /dev/sdm
+  elif [ "$DRV" = "13" ]; then
+    output_gpt_partitions /dev/sdn
+  elif [ "$DRV" = "14" ]; then
+    output_gpt_partitions /dev/sdo
+  elif [ "$DRV" = "15" ]; then
+    output_gpt_partitions /dev/sdp
+  fi
+}
+
+# List the LVM volumes:
+list_lvm
+
+# List CRYPT volumes:
+list_crypt
+
+# List GPT partitions:
+cat /proc/partitions | while read line ; do
+  SMASHED_LINE=$line
+  MAJOR=`echo $SMASHED_LINE | cut -f 1 -d ' '`
+  MINOR=`echo $SMASHED_LINE | cut -f 2 -d ' '`
+  if [ "$MAJOR" = "8" ]; then
+    list_scsi_gpt $MINOR
+  fi
+done
+
+# Other partitions:
+if cat /proc/partitions | grep / 1> /dev/null 2> /dev/null ; then # new
+  cat /proc/partitions | grep / | while read line ; do
+    SMASHED_LINE=$line
+    MAJOR=`echo $SMASHED_LINE | cut -f 1 -d ' '`
+    MINOR=`echo $SMASHED_LINE | cut -f 2 -d ' '`
+    if [ "$MAJOR" = "3" ]; then
+      list_ide $MAJOR $MINOR hda hdb
+    elif [ "$MAJOR" = "8" ]; then
+      list_scsi $MINOR
+    elif [ "$MAJOR" = "9" ]; then
+      list_md `echo $SMASHED_LINE | cut -f 3 -d ' ' | tr -d '/'` \
+              `echo $SMASHED_LINE | cut -f 4 -d ' '`
+    elif [ "$MAJOR" = "22" ]; then
+      list_ide $MAJOR $MINOR hdc hdd
+    elif [ "$MAJOR" = "33" ]; then
+      list_ide $MAJOR $MINOR hde hdf
+    elif [ "$MAJOR" = "34" ]; then
+      list_ide $MAJOR $MINOR hdg hdh
+    elif [ "$MAJOR" = "48" ]; then
+      list_rd 0 $MINOR
+    elif [ "$MAJOR" = "49" ]; then
+      list_rd 1 $MINOR
+    elif [ "$MAJOR" = "50" ]; then
+      list_rd 2 $MINOR
+    elif [ "$MAJOR" = "51" ]; then
+      list_rd 3 $MINOR
+    elif [ "$MAJOR" = "52" ]; then
+      list_rd 4 $MINOR
+    elif [ "$MAJOR" = "53" ]; then
+      list_rd 5 $MINOR
+    elif [ "$MAJOR" = "54" ]; then
+      list_rd 6 $MINOR
+    elif [ "$MAJOR" = "55" ]; then
+      list_rd 7 $MINOR
+    elif [ "$MAJOR" = "56" ]; then
+      list_ide $MAJOR $MINOR hdi hdj
+    elif [ "$MAJOR" = "57" ]; then
+      list_ide $MAJOR $MINOR hdk hdl
+    elif [ "$MAJOR" = "72" ]; then
+      list_ida 0 $MINOR
+    elif [ "$MAJOR" = "73" ]; then
+      list_ida 1 $MINOR
+    elif [ "$MAJOR" = "74" ]; then
+      list_ida 2 $MINOR
+    elif [ "$MAJOR" = "75" ]; then
+      list_ida 3 $MINOR
+    elif [ "$MAJOR" = "76" ]; then
+      list_ida 4 $MINOR
+    elif [ "$MAJOR" = "77" ]; then
+      list_ida 5 $MINOR
+    elif [ "$MAJOR" = "78" ]; then
+      list_ida 6 $MINOR
+    elif [ "$MAJOR" = "79" ]; then
+      list_ida 7 $MINOR
+    elif [ "$MAJOR" = "80" ]; then
+      list_ide $MAJOR $MINOR hdm hdn
+    elif [ "$MAJOR" = "89" ]; then
+      list_ide $MAJOR $MINOR hdo hdp
+    elif [ "$MAJOR" = "90" ]; then
+      list_ide $MAJOR $MINOR hdq hdr
+    elif [ "$MAJOR" = "91" ]; then
+      list_ide $MAJOR $MINOR hds hdt
+    elif [ "$MAJOR" = "101" ]; then
+      list_amiraid $MAJOR $MINOR
+    elif [ "$MAJOR" = "104" \
+      -o "$MAJOR" = "105" \
+      -o "$MAJOR" = "106" \
+      -o "$MAJOR" = "107" \
+      -o "$MAJOR" = "108" \
+      -o "$MAJOR" = "109" \
+      -o "$MAJOR" = "110" \
+      -o "$MAJOR" = "111" ]; then
+      list_cciss $(( $MAJOR - 104 )) $MINOR
+    elif [ "$MAJOR" = "114" ]; then
+      list_ataraid $MAJOR $MINOR
+    fi
+  done
+else # old format and no RAID:
+  if cat /proc/partitions | grep md 1> /dev/null 2> /dev/null ; then
+    cat /proc/partitions | grep md | while read line ; do
+      SMASHED_LINE=$line
+      MAJOR=`echo $SMASHED_LINE | cut -f 1 -d ' '`
+      if [ "$MAJOR" = "9" ]; then
+        list_md `echo $SMASHED_LINE | cut -f 3 -d ' ' | tr -d '/'` \
+                `echo $SMASHED_LINE | cut -f 4 -d ' '`
+      fi
+    done
+  fi
+  fdisk -l 2> /dev/null | grep -v "ee  GPT" >> $TMP/SeTfdisk
+fi
+
+cat $TMP/SeTfdisk

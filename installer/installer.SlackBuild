@@ -30,10 +30,11 @@
 # as well as the Image :-(
 #
 # You will need:
-#   * A dirty kernel tree in the directory '../kernel_raspi/linux'
-#   * initrd-versatile.img, probably as a symlink to your armedslack-current
-#     tree (it's in armedslack-current/isolinux)
-#   * 'Extra' packages in $OUTPUT
+#   * initrd-versatile.img in this directory, probably as a symlink to your
+#     armedslack-current tree (it's in armedslack-current/isolinux)
+#   * A recently built kernel tree in the directory '../kernel_raspi/linux'
+#   * The firmware git repo in '../raspi-boot/firmware'
+#   * 'Extra' packages already built in $OUTPUT
 #
 #------------------------------------------------------------------------------
 
@@ -43,60 +44,60 @@ IMAGE=raspi-slack-installer_$(date '+%d%b%y').img
 
 CWD=$(pwd)
 
+rm -rf $TMP
+mkdir -p $TMP
+
 set -e
 
 #------------------------------------------------------------------------------
 # (0) Extract the installer tree from the upstream initrd
 
-# Use /tmp not $TMP because /tmp/initrd-tree is hardcoded in the kernel config
-rm -rf /tmp/initrd-tree
-mkdir -p /tmp/initrd-tree
-cd /tmp/initrd-tree
+rm -rf $TMP/initrd-tree
+mkdir -p $TMP/initrd-tree
+cd $TMP/initrd-tree
 zcat $CWD/initrd-versatile.img | cpio -iv
+
+# patch recent problem recognising partitions mmcblk0p1 etc on SD card
+cp $CWD/probe $TMP/initrd-tree/sbin/
 
 #------------------------------------------------------------------------------
 # (1) Add raspi device nodes (maybe not needed -- to be checked)
 
-cd /tmp/initrd-tree/
+cd $TMP/initrd-tree/
 tar xvf $CWD/../raspi-devs/_devs.tar.xz
 
 #------------------------------------------------------------------------------
 # (2) Add README and raspi-extra to the installer tree
 
-cat $CWD/README.installer > /tmp/initrd-tree/README
+cat $CWD/README.installer > $TMP/initrd-tree/README
 
-mkdir -p /tmp/initrd-tree/raspi-extra
+mkdir -p $TMP/initrd-tree/raspi-extra
 cp -a -v \
   $OUTPUT/raspi-*.t?z \
   $OUTPUT/kernel*.t?z \
-  /tmp/initrd-tree/raspi-extra
+  $TMP/initrd-tree/raspi-extra
 
 #------------------------------------------------------------------------------
 # (3) Add kernel modules to the installer tree
 
 # Remove the versatile modules
 # (it might be helpful to qemu users to keep them, but they're just too big)
-rm -rf /tmp/initrd-tree/lib/modules/*
+rm -rf $TMP/initrd-tree/lib/modules/*
 
 cd $CWD/../kernel_raspi/linux
-make modules_install INSTALL_MOD_PATH=/tmp/initrd-tree
+make modules_install INSTALL_MOD_PATH=$TMP/initrd-tree
 
 #------------------------------------------------------------------------------
-# (4) Build the installer tree into a new kernel image
+# (4) Roll the initrd.gz
 
-cd $CWD/../kernel_raspi/linux
-
-# Set kernel config for embedded initrd
-if ! fgrep -q 'CONFIG_INITRAMFS_SOURCE="/tmp/initrd-tree"' .config ; then
-  patch --fuzz=3 -p1 <$CWD/initrd-config.patch
-fi
-make Image
+cd $TMP/initrd-tree
+find . | cpio -o -v -H newc | gzip -9c > $TMP/initrd.gz
 
 #------------------------------------------------------------------------------
-# (5) Take an empty image and format it
+# (5) Make an empty image and format it
 
 rm -f $TMP/$IMAGE
-echo "Formatting $TMP/$IMAGE"
+echo "Making $TMP/$IMAGE"
 dd if=/dev/zero of=$TMP/$IMAGE bs=65536 count=30000
 
 # parted's label will have flash-friendly geometry: 4heads/32sect/30000cyl
@@ -131,30 +132,43 @@ fi
 mkdir -p $TMP/mnt
 mount -t vfat /dev/md/raspimg1 $TMP/mnt
 
-# Get the boot firmware
-rm -rf $TMP/firmware
-mkdir -p $TMP/firmware
-cd $TMP/firmware
-explodepkg $OUTPUT/raspi-boot-*.t?z
+# Get the boot firmware and default config
+cd $CWD/../raspi-boot/firmware
 cp -v \
-  boot/bootcode.bin boot/loader.bin boot/start.elf boot/LICENCE.broadcom \
+  boot/bootcode.bin boot/loader.bin \
+  boot/LICENCE.broadcom \
   $TMP/mnt
-cat boot/config.txt.new > $TMP/mnt/config.txt
+cp -v \
+  boot/arm224_start.elf \
+  $TMP/mnt/start.elf
+cat $CWD/../raspi-boot/config.txt.new > $TMP/mnt/config.txt
 
 # Get the kernel
 cp -v \
   $CWD/../kernel_raspi/linux/arch/arm/boot/Image \
   $TMP/mnt/kernel.img
-# Grab kernel command line from kernel config.  'root=' doesn't matter.
+# Take kernel command line from kernel config. 'root=' doesn't matter.
 grep 'CONFIG_CMDLINE=' $CWD/../kernel_raspi/linux/.config | \
   sed -e 's/CONFIG_CMDLINE="//' -e 's/"$//' \
   > $TMP/mnt/cmdline.txt
+
+# Get the initrd.gz
+cp -v \
+  $TMP/initrd.gz \
+  $TMP/mnt
+
+# Add initrd.gz stuff to /boot/config.txt and /boot/cmdline.txt
+LOADADDR="0xa00000"
+SIZE="0x$(printf '%x' $(stat --format='%s' $TMP/mnt/initrd.gz))"
+echo "ramfsfile=initrd.gz" >> $TMP/mnt/config.txt
+echo "ramfsaddr=$LOADADDR" >> $TMP/mnt/config.txt
+sed -i -e "s/\$/ initrd=$LOADADDR,$SIZE" $TMP/mnt/cmdline.txt
 
 # Assemble the README
 cat $CWD/README.installer                   > $TMP/mnt/README
 echo ""                                    >> $TMP/mnt/README
 echo ""                                    >> $TMP/mnt/README
-cat /tmp/initrd-tree/.installer-version    >> $TMP/mnt/README
+cat $TMP/initrd-tree/.installer-version    >> $TMP/mnt/README
 echo "Raspberry Pi:"                       >> $TMP/mnt/README
 echo "-------------"                       >> $TMP/mnt/README
 KREV="$(cd $CWD/../kernel_raspi/linux; git log --format='%h' -n 1)"
