@@ -77,11 +77,8 @@ cp -a \
   arm*_start.elf \
   $PKG/boot/
 
-# Install as .new even though it's not in /etc
-cat <<EOF > $PKG/boot/config.txt.new
-# For information about this file, see http://elinux.org/RPi_config.txt
-disable_overscan=1
-EOF
+# Install config.txt as .new even though it's not in /etc
+cat < $CWD/config.txt.new > $PKG/boot/config.txt.new
 
 mkdir -p $PKG/usr/doc/$PRGNAM-$VERSION
 cp -a \
