@@ -9,13 +9,22 @@ lines' entries s0, s1 and s2.  The Rasberry Pi's UART is /dev/ttyAMA0, not
 
 * Clock - the Raspberry Pi has no hardware clock and boots with the
 date/time set to 1970-01-01, so /etc/rc.d/rc.local will be modified to
-set the correct date/time from the network (using the 'sntp' command).
-Also, to provide a pragmatic approximation for the correct date/time
-during early boot and if the network is unavailable, /sbin/hwclock will be
-replaced by a shellscript which saves the date/time to disk on shutdown
-and restores it on startup.  This prevents the error 'Cannot access the
-Hardware Clock via any known method'.
+set the correct date/time from the network (using the 'sntp' command). 
+Additionally, the file /etc/e2fsck.conf will be created to stop e2fsck
+from erroring or requiring manual intervention when it encounters bad time
+stamps.  The fakeclock mechanism in a previous version of this package is
+no longer used, and the original hwclock command will be restored when you
+upgrade this package.  This reinstates the error 'Cannot access the
+Hardware Clock via any known method' :-)
 
 * Tuning - /etc/sysctl.conf will be created to tune vm.min_free_kbytes.
 This prevents the error 'smsc95xx 1-1.1:1.0: eth0: kevent 2 may have
 been dropped'.
+
+* libcofi_rpi - The library /usr/lib/libcofi_rpi.so contains teh_orph's
+replacement memcpy and memset functions.  These replacements have been
+reported to improve application performance.  They are disabled by default,
+but if you want to enable them, use this command and then log out and log
+in again:
+
+  chmod ugo-x /etc/profile.d/libcofi_rpi.{sh,csh}

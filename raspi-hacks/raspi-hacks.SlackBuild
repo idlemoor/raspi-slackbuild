@@ -24,7 +24,7 @@
 #  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 PRGNAM="raspi-hacks"
-VERSION=${VERSION:-1.0}
+VERSION=${VERSION:-2.0}
 ARCH="arm"
 BUILD=${BUILD:-1}
 TAG=${TAG:-}
@@ -34,62 +34,101 @@ TMP=${TMP:-/tmp}
 OUTPUT=${OUTPUT:-/tmp}
 PKG=$TMP/package-$PRGNAM
 
-rm -rf $PKG
-mkdir -p $TMP $PKG
+mkdir -p $TMP
 
+rm -rf $PKG
+mkdir -p $PKG/etc
+mkdir -p $PKG/usr/lib
 mkdir -p $PKG/install
 
+cat $CWD/doinst.sh > $PKG/install/doinst.sh
+
+# Serial port fixup
 cat << EOF >> $PKG/install/doinst.sh
-# /etc/inittab -- modify serial port entry 's0'
-sed -i \
-  -e 's;^s0:12345:respawn:/sbin/agetty 115200 ttyS0 vt100\$;#s0:12345:respawn:/sbin/agetty -L ttyAMA0 9600 vt100;' \
-  etc/inittab
+# inittab -- modify serial port entry 's0'
+if grep -q '^s0:.*ttyS0' etc/inittab ; then
+  sed -i \
+    -e 's;^s0:12345:respawn:/sbin/agetty 115200 ttyS0 vt100\$;#s0:12345:respawn:/sbin/agetty -L ttyAMA0 9600 vt100;' \
+    etc/inittab
+fi
+
 EOF
 
+# Hardware clock fixup (1) rc.local
 cat << EOF >> $PKG/install/doinst.sh
-# /etc/rc.d/rc.local -- set time from network
+# rc.local -- set time from network
 if ! grep -q sntp etc/rc.d/rc.local ; then
   echo '' >> etc/rc.d/rc.local
   echo "# Added by $PRGNAM-$VERSION-$ARCH-$BUILD$TAG" >> etc/rc.d/rc.local
   echo 'sntp -s pool.ntp.org >/dev/null &' >> etc/rc.d/rc.local
 fi
+
 EOF
 
-mkdir -p $PKG/sbin
-cp -a $CWD/fakeclock.sh $PKG/sbin
-chmod 755 $PKG/sbin/fakeclock.sh
-( cd $PKG/sbin; ln -s fakeclock.sh hwclock )
+# Hardware clock fixup (2) e2fsck.conf
+cp $CWD/e2fsck.conf.new \
+  $PKG/etc
 cat << EOF >> $PKG/install/doinst.sh
-# /sbin/hwclock -- save the original (from util-linux)
-if [ -f sbin/hwclock -a ! -L sbin/hwclock ]; then
-  mv sbin/hwclock sbin/hwclock.orig
+# e2fsck.conf -- hardware clock fix
+config etc/e2fsck.conf.new
+
+EOF
+
+# Hardware clock de-fixup :-)
+cat << EOF >> $PKG/install/doinst.sh
+# hwclock -- reinstate the original if moved by previous raspi-hacks
+if [ -f sbin/hwclock.orig ]; then
+  rm -f sbin/hwclock
+  mv sbin/hwclock.orig sbin/hwclock
 fi
+
 EOF
 
-mkdir -p $PKG/etc
-echo "vm.min_free_kbytes = 32768" > $PKG/etc/sysctl.conf.new
+# Tuning via /etc/sysctl.conf
+cp $CWD/sysctl.conf.new \
+  $PKG/etc
 cat << EOF >> $PKG/install/doinst.sh
-# /etc/sysctl.conf -- set vm.min_free_kbytes
-config() {
-  NEW="\$1"
-  OLD="\$(dirname \$NEW)/\$(basename \$NEW .new)"
-  # If there's no config file by that name, mv it over:
-  if [ ! -r \$OLD ]; then
-    mv \$NEW \$OLD
-  elif [ "\$(cat \$OLD | md5sum)" = "\$(cat \$NEW | md5sum)" ]; then # toss the redundant copy
-    rm \$NEW
-  fi
-  # Otherwise, we leave the .new copy for the admin to consider...
-}
+# sysctl.conf -- set vm.min_free_kbytes
 config etc/sysctl.conf.new
+
 EOF
 
+# Build and install libcofi_rpi
+(
+  cd libcofi_rpi
+  rm -f *.o *.so
+  make libcofi_rpi.so
+)
+
+mkdir -p $PKG/usr/lib
+cp libcofi_rpi/libcofi_rpi.so \
+  $PKG/usr/lib
+chmod 644 $PKG/usr/lib/libcofi_rpi.so
+
+mkdir -p $PKG/etc/profile.d
+cp \
+  libcofi_rpi/libcofi_rpi.sh.new \
+  libcofi_rpi/libcofi_rpi.csh.new \
+  $PKG/etc/profile.d
+chmod 644 \
+  $PKG/etc/profile.d/libcofi_rpi.sh.new \
+  $PKG/etc/profile.d/libcofi_rpi.csh.new
+
+cat << EOF >> $PKG/install/doinst.sh
+# libcofi_rpi.sh -- activate replacement memcpy/memset
+preserve_perms etc/profile.d/libcofi_rpi.sh.new
+preserve_perms etc/profile.d/libcofi_rpi.csh.new
+
+EOF
+
+# Documentation
 mkdir -p $PKG/usr/doc/$PRGNAM-$VERSION
 cp -a \
   $CWD/README \
+  $CWD/libcofi_rpi/README.libcofi_rpi \
   $PKG/usr/doc/$PRGNAM-$VERSION
 
+# Finish off
 cat $CWD/slack-desc > $PKG/install/slack-desc
-
 cd $PKG
 /sbin/makepkg -l y -c n $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.${PKGTYPE:-tgz}
