@@ -162,7 +162,7 @@ LOADADDR="0xa00000"
 SIZE="0x$(printf '%x' $(stat --format='%s' $TMP/mnt/initrd.gz))"
 echo "ramfsfile=initrd.gz" >> $TMP/mnt/config.txt
 echo "ramfsaddr=$LOADADDR" >> $TMP/mnt/config.txt
-sed -i -e "s/\$/ initrd=$LOADADDR,$SIZE" $TMP/mnt/cmdline.txt
+sed -i -e "s/\$/ initrd=$LOADADDR,$SIZE/" $TMP/mnt/cmdline.txt
 
 # Assemble the README
 cat $CWD/README.installer                   > $TMP/mnt/README
