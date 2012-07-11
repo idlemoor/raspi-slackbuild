@@ -62,4 +62,4 @@ firmware and other extra packages as follows:
   ROOT=/mnt installpkg /raspi-extra/kernel* /raspi-extra/raspi*
 
 
-(9) Now you can reboot your new system :-)
+(9) Now you can type 'reboot' to reboot your new system :-)

@@ -104,6 +104,7 @@ mkdir -p $PKG/usr/lib
 cp libcofi_rpi/libcofi_rpi.so \
   $PKG/usr/lib
 chmod 644 $PKG/usr/lib/libcofi_rpi.so
+rm -f *.o *.so
 
 mkdir -p $PKG/etc/profile.d
 cp \

@@ -7,6 +7,9 @@ config() {
   elif [ "$(cat $OLD | md5sum)" = "$(cat $NEW | md5sum)" ]; then
     # toss the redundant copy
     rm $NEW
+  elif [ -f /.installer-version ]; then
+    # We're in the Installer, so overwrite the Installer-specific file
+    mv $NEW $OLD
   fi
   # Otherwise, we leave the .new copy for the admin to consider...
 }
