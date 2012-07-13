@@ -38,77 +38,79 @@
 #
 #------------------------------------------------------------------------------
 
-TMP=${TMP:-/tmp/installer}
+TMP=${TMP:-/tmp}
 OUTPUT=${OUTPUT:-/tmp}
+
+MYTMP=$TMP/installer
 IMAGE=raspi-slack-installer_$(date '+%d%b%y').img
 
 CWD=$(pwd)
 
-rm -rf $TMP
-mkdir -p $TMP
+rm -rf $MYTMP
+mkdir -p $MYTMP
 
 set -e
 
 #------------------------------------------------------------------------------
 # (0) Extract the installer tree from the upstream initrd
 
-rm -rf $TMP/initrd-tree
-mkdir -p $TMP/initrd-tree
-cd $TMP/initrd-tree
+rm -rf $MYTMP/initrd-tree
+mkdir -p $MYTMP/initrd-tree
+cd $MYTMP/initrd-tree
 zcat $CWD/initrd-versatile.img | cpio -iv
 
 # patch recent problem recognising partitions mmcblk0p1 etc on SD card
-cp $CWD/probe $TMP/initrd-tree/sbin/
+cp $CWD/probe $MYTMP/initrd-tree/sbin/
 
 #------------------------------------------------------------------------------
 # (1) Add raspi device nodes (maybe not needed -- to be checked)
 
-cd $TMP/initrd-tree/
+cd $MYTMP/initrd-tree/
 tar xvf $CWD/../raspi-devs/_devs.tar.xz
 
 #------------------------------------------------------------------------------
 # (2) Add README and raspi-extra to the installer tree
 
-cat $CWD/README.installer > $TMP/initrd-tree/README
+cat $CWD/README.installer > $MYTMP/initrd-tree/README
 
-mkdir -p $TMP/initrd-tree/raspi-extra
+mkdir -p $MYTMP/initrd-tree/raspi-extra
 cp -a -v \
   $OUTPUT/raspi-*.t?z \
   $OUTPUT/kernel*.t?z \
-  $TMP/initrd-tree/raspi-extra
+  $MYTMP/initrd-tree/raspi-extra
 
 #------------------------------------------------------------------------------
 # (3) Add kernel modules to the installer tree
 
 # Remove the versatile modules
 # (it might be helpful to qemu users to keep them, but they're just too big)
-rm -rf $TMP/initrd-tree/lib/modules/*
+rm -rf $MYTMP/initrd-tree/lib/modules/*
 
 cd $CWD/../kernel_raspi/linux
-make modules_install INSTALL_MOD_PATH=$TMP/initrd-tree
+make modules_install INSTALL_MOD_PATH=$MYTMP/initrd-tree
 
 #------------------------------------------------------------------------------
 # (4) Roll the initrd.gz
 
-cd $TMP/initrd-tree
-find . | cpio -o -v -H newc | gzip -9c > $TMP/initrd.gz
+cd $MYTMP/initrd-tree
+find . | cpio -o -v -H newc | gzip -9c > $MYTMP/initrd.gz
 
 #------------------------------------------------------------------------------
 # (5) Make an empty image and format it
 
-rm -f $TMP/$IMAGE
-echo "Making $TMP/$IMAGE"
-dd if=/dev/zero of=$TMP/$IMAGE bs=65536 count=30000
+rm -f $MYTMP/$IMAGE
+echo "Making $MYTMP/$IMAGE"
+dd if=/dev/zero of=$MYTMP/$IMAGE bs=65536 count=30000
 
 # parted's label will have flash-friendly geometry: 4heads/32sect/30000cyl
 # The numbers below are pragmatically determined ;-)
-parted -s --align cylinder $TMP/$IMAGE \
+parted -s --align cylinder $MYTMP/$IMAGE \
   mklabel msdos \
   mkpart primary fat32 0M 50M \
   mkpart primary linux-swap 50M 450M \
   mkpart primary ext2 450M 1966M
 
-LOOPDEV=$(losetup -f --show $TMP/$IMAGE)
+LOOPDEV=$(losetup -f --show $MYTMP/$IMAGE)
 mdadm --build --force raspimg --level linear --raid-devices 1 $LOOPDEV
 # It takes a few secs to ready /dev/md/* apparently
 sleep 5
@@ -122,74 +124,74 @@ mkfs -t ext4 -j /dev/md/raspimg3
 EMPTY=raspi-empty-sdcard.img
 if [ ! -f $OUTPUT/$EMPTY.xz ]; then
   echo "Compressing image to $OUTPUT/$EMPTY.xz"
-  xz -v < $TMP/$IMAGE > $OUTPUT/$EMPTY.xz
+  xz -v < $MYTMP/$IMAGE > $OUTPUT/$EMPTY.xz
   sha1sum $OUTPUT/$EMPTY.xz > $OUTPUT/$EMPTY.xz.sha1
 fi
 
 #------------------------------------------------------------------------------
 # (6) Copy everything onto image partition 1
 
-mkdir -p $TMP/mnt
-mount -t vfat /dev/md/raspimg1 $TMP/mnt
+mkdir -p $MYTMP/mnt
+mount -t vfat /dev/md/raspimg1 $MYTMP/mnt
 
 # Get the boot firmware and default config
 cd $CWD/../raspi-boot/firmware
 cp -v \
   boot/bootcode.bin boot/loader.bin \
   boot/LICENCE.broadcom \
-  $TMP/mnt
+  $MYTMP/mnt
 cp -v \
   boot/arm224_start.elf \
-  $TMP/mnt/start.elf
-cat $CWD/../raspi-boot/config.txt.new > $TMP/mnt/config.txt
+  $MYTMP/mnt/start.elf
+cat $CWD/../raspi-boot/config.txt.new > $MYTMP/mnt/config.txt
 
 # Get the kernel
 cp -v \
   $CWD/../kernel_raspi/linux/arch/arm/boot/Image \
-  $TMP/mnt/kernel.img
+  $MYTMP/mnt/kernel.img
 # Take kernel command line from kernel config. 'root=' doesn't matter.
 grep 'CONFIG_CMDLINE=' $CWD/../kernel_raspi/linux/.config | \
   sed -e 's/CONFIG_CMDLINE="//' -e 's/"$//' \
-  > $TMP/mnt/cmdline.txt
+  > $MYTMP/mnt/cmdline.txt
 
 # Get the initrd.gz
 cp -v \
-  $TMP/initrd.gz \
-  $TMP/mnt
+  $MYTMP/initrd.gz \
+  $MYTMP/mnt
 
 # Add initrd.gz stuff to /boot/config.txt and /boot/cmdline.txt
 LOADADDR="0xa00000"
-SIZE="0x$(printf '%x' $(stat --format='%s' $TMP/mnt/initrd.gz))"
-echo "ramfsfile=initrd.gz" >> $TMP/mnt/config.txt
-echo "ramfsaddr=$LOADADDR" >> $TMP/mnt/config.txt
-sed -i -e "s/\$/ initrd=$LOADADDR,$SIZE/" $TMP/mnt/cmdline.txt
+SIZE="0x$(printf '%x' $(stat --format='%s' $MYTMP/mnt/initrd.gz))"
+echo "ramfsfile=initrd.gz" >> $MYTMP/mnt/config.txt
+echo "ramfsaddr=$LOADADDR" >> $MYTMP/mnt/config.txt
+sed -i -e "s/\$/ initrd=$LOADADDR,$SIZE/" $MYTMP/mnt/cmdline.txt
 
 # Assemble the README
-cat $CWD/README.installer                   > $TMP/mnt/README
-echo ""                                    >> $TMP/mnt/README
-echo ""                                    >> $TMP/mnt/README
-cat $TMP/initrd-tree/.installer-version    >> $TMP/mnt/README
-echo "Raspberry Pi:"                       >> $TMP/mnt/README
-echo "-------------"                       >> $TMP/mnt/README
+cat $CWD/README.installer                   > $MYTMP/mnt/README
+echo ""                                    >> $MYTMP/mnt/README
+echo ""                                    >> $MYTMP/mnt/README
+cat $MYTMP/initrd-tree/.installer-version  >> $MYTMP/mnt/README
+echo "Raspberry Pi:"                       >> $MYTMP/mnt/README
+echo "-------------"                       >> $MYTMP/mnt/README
 KREV="$(cd $CWD/../kernel_raspi/linux; git log --format='%h' -n 1)"
-echo "Kernel git rev.......: $KREV"        >> $TMP/mnt/README
+echo "Kernel git rev.......: $KREV"        >> $MYTMP/mnt/README
 BREV="$(cd $CWD/../raspi-boot/firmware; git log --format='%h' -n 1)"
-echo "Boot fw git rev......: $BREV"        >> $TMP/mnt/README
-echo "Build host...........: $(uname -a)"  >> $TMP/mnt/README
-echo "Build date...........: $(date)"      >> $TMP/mnt/README
+echo "Boot fw git rev......: $BREV"        >> $MYTMP/mnt/README
+echo "Build host...........: $(uname -a)"  >> $MYTMP/mnt/README
+echo "Build date...........: $(date)"      >> $MYTMP/mnt/README
 
 #------------------------------------------------------------------------------
 # (7) Compress and do a checksum
 
-umount -v $TMP/mnt
+umount -v $MYTMP/mnt
 mdadm --stop /dev/md/raspimg
 losetup -d $LOOPDEV
 
 echo "Compressing image to $OUTPUT/$IMAGE.xz"
-xz -v < $TMP/$IMAGE > $OUTPUT/$IMAGE.xz
+xz -v < $MYTMP/$IMAGE     > $OUTPUT/$IMAGE.xz
 sha1sum $OUTPUT/$IMAGE.xz > $OUTPUT/$IMAGE.xz.sha1
 
-rm $TMP/$IMAGE
+rm $MYTMP/$IMAGE
 
 #------------------------------------------------------------------------------
 
