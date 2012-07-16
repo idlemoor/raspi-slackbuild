@@ -1,7 +1,8 @@
 raspi-hacks -- modifications for Slackware ARM on Raspberry Pi
 
-This package will make the following changes to the Slackware ARM
-installation on your Raspberry Pi:
+The raspi-hacks package applies error fixes and performance improvements
+to the Slackware ARM installation on your Raspberry Pi.  It will make the
+following changes:
 
 * Serial port - /etc/inittab will be modified to replace the 'Local serial
 lines' entries s0, s1 and s2.  The Rasberry Pi's UART is /dev/ttyAMA0, not

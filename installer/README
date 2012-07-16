@@ -1,9 +1,7 @@
-Run this script with a dirty kernel tree after building the kernel & modules,
-and don't mess with the .config.  Otherwise it'll want to rebuild the modules
-as well as the Image :-(
-
-You will need:
-  * A dirty kernel tree in the directory '../kernel_raspi/linux'
-  * initrd-versatile.img, probably as a symlink to your armedslack-current
-    tree (it's in armedslack-current/isolinux)
-  * 'Extra' packages in $OUTPUT
+To run this script you will need:
+  * initrd-versatile.img in this directory, possibly as a symlink to your
+    armedslack-current tree (it's in armedslack-current/isolinux)
+  * A recently built kernel tree with 'Image' and modules in
+    '../kernel_raspi/linux'
+  * The firmware git repo in '../raspi-boot/firmware'
+  * 'Extra' packages already built in $OUTPUT
