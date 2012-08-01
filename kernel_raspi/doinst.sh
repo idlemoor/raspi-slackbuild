@@ -17,9 +17,14 @@ config() {
 # Start with a wild guess
 rootdev='mmcblk0p3'
 if [ -L dev/root ]; then
+  # this went away in recent -current :-/
   rootdev=/dev/$(readlink dev/root)
 elif [ -f /tag/README ]; then
+  # we're in the Installer
   rootdev=$(awk '{if ($2=="/mnt") print $1}' /proc/mounts)
+elif [ -f boot/cmdline.txt ]; then
+  rootdev=$(grep 'root=' boot/cmdline.txt | \
+            sed -e 's/^.*root=//' -e 's/ .*$//' )
 elif [ -f proc/partitions ]; then
   # even wilder guesses :-(
   if grep -q mmcblk0p3 proc/partitions; then
@@ -32,3 +37,6 @@ fi
 sed -i -e "s:@ROOTDEV@:${rootdev}:" boot/cmdline.txt.new
 
 config boot/cmdline.txt.new
+
+# /boot is a fat filesystem, so you can't be too careful
+sync;sync

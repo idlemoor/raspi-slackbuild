@@ -50,8 +50,6 @@ rm -rf $PKG
 mkdir -p $PKG
 
 cd $CWD/firmware/boot
-GITREV=$(git log --format='%h' -n 1)
-
 chown root:root *
 chmod 644 *
 
@@ -62,19 +60,31 @@ cp -a \
 zcat $CWD/README.initrd.gz > $PKG/boot/README.initrd
 zcat $CWD/README.boot.gz   > $PKG/boot/README
 
-# The memory allocation for the OS and GPU is set here (or by an env variable).
-# LINUXMEM must be set to 224 or 192 or 128.
+# The default memory allocation for the OS and GPU is set here (or by an env variable).
+# LINUXMEM must be set to 240 or 224 or 192 or 128.
 # The GPU will get the rest of memory, i.e. (256-$LINUXMEM) Mb.
 # We use the 224Mb version by default (upstream has 192Mb by default, but this
 # seems pointless until accelerated video works).
 LINUXMEM=${LINUXMEM:-224}
 cp -a \
   arm${LINUXMEM}_start.elf \
-  $PKG/boot/start.elf
+  $PKG/boot/start.elf.new
+
 # But we'll deliver all the start.elf files (as is customary) so the user can
 # change this if required:
 cp -a \
   arm*_start.elf \
+  $PKG/boot/
+
+# Record the arm*_start.elf md5sums so start.elf can be identified at the next upgrade
+mkdir -p $PKG/var/lib/$PRGNAM
+md5sum arm*_start.elf > $PKG/var/lib/$PRGNAM/startelf.md5.new
+
+# There is now a documented 'safe mode', so we'll include upstream's prebuilt
+# 'emergency kernel' with its built-in busybox.
+# To boot it, add a jumper on pins 5 and 6 of P1.
+cp -a \
+  kernel_emergency.img \
   $PKG/boot/
 
 # Install config.txt as .new even though it's not in /etc
@@ -85,17 +95,21 @@ cp -a \
   LICENCE.broadcom \
   $PKG/usr/doc/$PRGNAM-$VERSION
 
-mkdir -p $PKG/install
-cat $CWD/slack-desc > $PKG/install/slack-desc
-cat $CWD/doinst.sh > $PKG/install/doinst.sh
-
-# Add version stamp into /boot
+# Add version stamp into /boot and /usr/doc
 echo "Package: $PRGNAM-$VERSION-$ARCH-$BUILD$TAG" \
   >  $PKG/boot/version-$PRGNAM.txt
 echo "Build date: $(date -u '+%F %T')" \
   >> $PKG/boot/version-$PRGNAM.txt
+GITREV=$(git log --format='%h' -n 1)
 echo "Git revision: $GITREV" \
   >> $PKG/boot/version-$PRGNAM.txt
+cp \
+  $PKG/boot/version-$PRGNAM.txt \
+  $PKG/usr/doc/$PRGNAM-$VERSION/version.txt
+
+mkdir -p $PKG/install
+cat $CWD/slack-desc > $PKG/install/slack-desc
+cat $CWD/doinst.sh > $PKG/install/doinst.sh
 
 cd $PKG
 /sbin/makepkg -l y -c n $OUTPUT/$PRGNAM-$VERSION-$ARCH-$BUILD$TAG.${PKGTYPE:-tgz}
