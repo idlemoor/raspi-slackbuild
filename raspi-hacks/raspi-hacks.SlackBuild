@@ -24,7 +24,7 @@
 #  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 PRGNAM="raspi-hacks"
-VERSION=${VERSION:-2.0}
+VERSION=${VERSION:-2.1}
 ARCH="arm"
 BUILD=${BUILD:-1}
 TAG=${TAG:-}
@@ -96,7 +96,7 @@ EOF
 # Build and install libcofi_rpi
 (
   cd libcofi_rpi
-  rm -f *.o *.so
+  rm -f *.s *.o *.so
   make libcofi_rpi.so
 )
 
@@ -104,7 +104,10 @@ mkdir -p $PKG/usr/lib
 cp libcofi_rpi/libcofi_rpi.so \
   $PKG/usr/lib
 chmod 644 $PKG/usr/lib/libcofi_rpi.so
-rm -f *.o *.so
+rm -f \
+  libcofi_rpi/*.s \
+  libcofi_rpi/*.o \
+  libcofi_rpi/*.so
 
 mkdir -p $PKG/etc/profile.d
 cp \
