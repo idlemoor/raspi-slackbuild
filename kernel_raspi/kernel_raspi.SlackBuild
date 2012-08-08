@@ -107,11 +107,9 @@ echo "Build date: $(date -u '+%F %T')" \
   >> $PKG/boot/version-$PRGNAM.txt
 echo "Git revision: $GITREV" \
   >> $PKG/boot/version-$PRGNAM.txt
-
-mkdir -p $PKG/usr/doc/$PRGNAM-$MYVER
 cp \
   $PKG/boot/version-$PRGNAM.txt \
-  $PKG/usr/doc/$PRGNAM-$MYVER/version.txt
+  $PKG/usr/doc/$PRGNAM-$PKGVER/version.txt
 
 cd $PKG
 /sbin/makepkg -l y -c n $OUTPUT/$PRGNAM-$PKGVER-$KNLARCH-$BUILD$TAG.${PKGTYPE:-tgz}
