@@ -71,10 +71,15 @@ tar xvf $CWD/../raspi-devs/_devs.tar.xz
 cat $CWD/README.installer > $MYTMP/initrd-tree/README
 
 mkdir -p $MYTMP/initrd-tree/raspi-extra
-cp -a -v \
-  $OUTPUT/raspi-*.t?z \
-  $OUTPUT/kernel*.t?z \
-  $MYTMP/initrd-tree/raspi-extra
+for pkgbase in \
+  raspi-boot raspi-devs raspi-hacks \
+  kernel_raspi kernel-modules-raspi
+do
+  pkg=$(ls -t $OUTPUT/$pkgbase-*.t?z | head -1)
+  cp -a -v \
+    $pkg \
+    $MYTMP/initrd-tree/raspi-extra/
+done
 
 #------------------------------------------------------------------------------
 # (3) Add kernel modules to the installer tree
