@@ -97,15 +97,19 @@ find . | cpio -o -v -H newc | gzip -9c > $MYTMP/initrd.gz
 
 rm -f $MYTMP/$IMAGE
 echo "Making $MYTMP/$IMAGE"
-dd if=/dev/zero of=$MYTMP/$IMAGE bs=65536 count=30000
 
-# parted's label will have flash-friendly geometry: 4heads/32sect/30000cyl
-# The numbers below are pragmatically determined ;-)
-parted -s --align cylinder $MYTMP/$IMAGE \
-  mklabel msdos \
-  mkpart primary fat32 0M 50M \
-  mkpart primary linux-swap 50M 450M \
-  mkpart primary ext2 450M 1966M
+# Let's work in 512B sectors.
+# 128 "heads" and 32 "sectors" => 2MiB "cylinders".
+# 4 "cylinders" = 8MiB erase block boundary (or 2*4MiB boundaries).
+# So keep partition boundaries at 4-cyl multiples for best results.
+# 944 "cylinders" = 1979711488B, which is < 2MB, so fits on a "2Mb" card.
+dd if=/dev/zero of=$MYTMP/$IMAGE bs=512 count=$(( 128 * 32 * 944 ))
+
+# Drop in the prepared MBR.
+# Partition 1 start    2048 end  114687 type 0c
+# Partition 2 start  114688 end 1019903 type 82
+# Partition 3 start 1019904 end 3866623 type 83
+dd if=$CWD/mbr of=$MYTMP/$IMAGE bs=512 count=1 conv=notrunc
 
 LOOPDEV=$(losetup -f --show $MYTMP/$IMAGE)
 mdadm --build --force raspimg --level linear --raid-devices 1 $LOOPDEV
@@ -114,7 +118,7 @@ sleep 5
 
 mkdosfs -I /dev/md/raspimg1
 mkswap /dev/md/raspimg2
-mkfs -t ext4 -j /dev/md/raspimg3
+mkfs -t ext4 -O ^has_journal -E stride=2,stripe-width=1024 -b 4096 /dev/md/raspimg3
 
 # Save the empty SD card image as a useful by-product.
 # (Very time consuming, so only do this if needed.)

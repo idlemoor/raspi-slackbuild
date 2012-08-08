@@ -119,6 +119,18 @@ list_amiraid() {
   fi
 }
 
+list_mmc() {
+  # find drive
+  DRV=`expr $2 / 8`
+  NUM=`expr $2 % 8`
+  if [ "$NUM" = "0" ]; then
+     fdisk -l /dev/mmcblk$DRV >> $TMP/SeTfdisk
+     output_gpt_partitions /dev/mmcblk$DRV >> $TMP/SeTfdisk
+  else
+     return
+  fi
+}
+
 is_swap() {
   HEADER=`dd if="$1" bs=1 skip=4086 count=10 2>/dev/null`
   if [ "$HEADER" = "SWAPSPACE2" -o "$HEADER" = "SWAP_SPACE" ]; then
@@ -275,8 +287,8 @@ cat /proc/partitions | while read line ; do
 done
 
 # Other partitions:
-if cat /proc/partitions | grep / 1> /dev/null 2> /dev/null ; then # new
-  cat /proc/partitions | grep / | while read line ; do
+if cat /proc/partitions | grep -E '/|[0-9]' 1>/dev/null 2>/dev/null ; then # new
+  cat /proc/partitions | grep -E '/|[0-9]' | while read line ; do
     SMASHED_LINE=$line
     MAJOR=`echo $SMASHED_LINE | cut -f 1 -d ' '`
     MINOR=`echo $SMASHED_LINE | cut -f 2 -d ' '`
@@ -350,6 +362,8 @@ if cat /proc/partitions | grep / 1> /dev/null 2> /dev/null ; then # new
       list_cciss $(( $MAJOR - 104 )) $MINOR
     elif [ "$MAJOR" = "114" ]; then
       list_ataraid $MAJOR $MINOR
+    elif [ "$MAJOR" = "179" ]; then
+      list_mmc $MAJOR $MINOR
     fi
   done
 else # old format and no RAID:
