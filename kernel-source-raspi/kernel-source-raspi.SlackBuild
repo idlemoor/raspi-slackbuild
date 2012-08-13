@@ -1,0 +1,64 @@
+#!/bin/sh
+
+# kernel-source.SlackBuild
+# Package the Raspberry Pi kernel source
+#
+# Copyright 2012 David Spencer, Baildon, West Yorkshire, U.K.
+# All rights reserved.
+#
+# Redistribution and use of this script, with or without modification, is
+# permitted provided that the following conditions are met:
+#
+# 1. Redistributions of this script must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+#  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+#  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
+#  EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+#  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+#  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+#  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+#  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+FLAVOUR=raspi
+PRGNAM=kernel-source-$FLAVOUR
+
+VERSION=${VERSION:-$(cd /lib/modules; /bin/ls -t | head -1)}
+BUILD=${BUILD:-1}
+TAG=${TAG:-}
+
+CWD=$(pwd)
+TMP=${TMP:-/tmp}
+OUTPUT=${OUTPUT:-/tmp}
+PKG=$TMP/package-$PRGNAM
+
+SLKARCH=noarch
+unset ARCH
+
+set -e
+
+rm -rf $PKG
+
+mkdir -p $PKG/usr/src/linux-$VERSION
+cd /usr/src/linux
+cp -a \
+  * \
+  .gitignore .config .mailmap \
+  $PKG/usr/src/linux-$VERSION
+
+cd $PKG/usr/src
+ln -s linux-$VERSION linux
+cd linux-$VERSION
+make clean
+make prepare
+
+mkdir -p $PKG/install
+cp \
+  $CWD/slack-desc \
+  $PKG/install
+
+cd $PKG
+/sbin/makepkg -l y -c n $OUTPUT/$PRGNAM-$(echo ${VERSION} | tr - _)-$SLKARCH-$BUILD$TAG.${PKGTYPE:-tgz}
