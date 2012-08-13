@@ -43,5 +43,8 @@ mv \
   var/lib/raspi-boot/startelf.md5.new \
   var/lib/raspi-boot/startelf.md5
 
+# This is a sneaky opportunity to remove the installer's initrd
+rm -f boot/install.gz
+
 # /boot is a fat filesystem, so you can't be too careful
 sync;sync
