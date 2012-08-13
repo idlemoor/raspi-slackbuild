@@ -23,7 +23,8 @@
 # Tweaked for Raspberry Pi by David Spencer <baildon.research@googlemail.com>
 #   kernel-modules -> kernel-modules-raspi, $VERSION, $OUTPUT, $TAG, $PKGTYPE ;-)
 
-VERSION=${VERSION:-3.1.9}
+# Assume that we want the newest set of modules on the system:
+VERSION=${VERSION:-$(cd /lib/modules; /bin/ls -t | head -1)}
 ARCH=${ARCH:-arm}
 BUILD=${BUILD:-1}
 TAG=${TAG:-}
@@ -85,4 +86,3 @@ EOF
 
 cd $PKG
 /sbin/makepkg -l y -c n $OUTPUT/kernel-modules-raspi-$(echo ${VERSION} | tr - _)-$ARCH-$BUILD$TAG.${PKGTYPE:-tgz}
-

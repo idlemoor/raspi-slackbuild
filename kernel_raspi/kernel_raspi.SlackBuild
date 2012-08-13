@@ -1,8 +1,7 @@
 #!/bin/sh
 
 # kernel_raspi.SlackBuild
-# Kernel and modules for Raspberry Pi
-# (Note that this SlackBuild will also run kernel-modules-raspi.SlackBuild)
+# Build the kernel for Raspberry Pi
 #
 # Copyright 2012 David Spencer, Baildon, West Yorkshire, U.K.
 # All rights reserved.
@@ -78,11 +77,11 @@ rm $TMP/versionvars
 KNLVER="${VERSION}.${PATCHLEVEL}.${SUBLEVEL}${EXTRAVERSION}-${MYVER}"
 PKGVER=$(echo "$KNLVER" | tr - _)
 
-make Image $NUMJOBS LOCALVERSION="-$MYVER"
+make zImage $NUMJOBS LOCALVERSION="-$MYVER"
 
 mkdir -p $PKG/boot
-# It's no longer necessary to wrap the Image, but apparently zImage isn't reliable.
-cp arch/arm/boot/Image $PKG/boot/kernel.img
+
+cp arch/arm/boot/zImage $PKG/boot/kernel.img
 cp System.map $PKG/boot/System.map
 
 # Put this in /usr/doc to avoid confusion with Pi-specific /boot/config.txt
@@ -122,15 +121,14 @@ cd $CWD/linux
 make modules $NUMJOBS LOCALVERSION="-$MYVER"
 make modules_install
 
-# Lie about where the source is ;-)
-cd /lib/modules/$KNLVER
-rm build;  ln -s /usr/src/linux build
-rm source; ln -s /usr/src/linux source
+# Link the source for the modules & source SlackBuilds
+rm -rf /usr/src/linux; ln -s $CWD/linux /usr/src/linux
+( cd /lib/modules/$KNLVER
+  rm build;  ln -s /usr/src/linux build
+  rm source; ln -s /usr/src/linux source
+)
 
-# Call kernel-modules-raspi.SlackBuild from here, so that we can tell it the
-# version.
-cd $CWD/../kernel-modules-raspi
-ARCH=$KNLARCH VERSION=$KNLVER \
-BUILD=$BUILD TAG=$TAG \
-TMP=$TMP OUTPUT=$OUTPUT \
-  sh kernel-modules-raspi.SlackBuild
+#------------------------------------------------------------------------------
+
+# Finished.
+exit 0
