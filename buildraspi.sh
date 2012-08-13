@@ -27,11 +27,11 @@
 #
 # This script will run the following SlackBuilds:
 #   raspi-boot
-#   raspi-devs
 #   raspi-hacks
 #   kernel_raspi
 #   kernel-modules-raspi
-#   installer
+#   installer (if DOINSTALLER=yes)
+#   kernel-source-raspi (if DOSOURCE=yes)
 #
 # Before running this script, you must set up the following git repos:
 #
@@ -53,11 +53,21 @@ CWD=$(pwd)
 
 set -e
 
-for PKGNAM in \
-  raspi-boot raspi-devs raspi-hacks \
-  kernel_raspi installer ; do
+if [ "${DOINSTALLER:-no}" = 'yes' ]; then
+  INSTALLER='installer'
+fi
+if [ "${DOSOURCE:-no}" = 'yes' ]; then
+  KNLSRC='kernel-source-raspi'
+fi
 
-# Note: kernel_raspi.SlackBuild will call kernel-modules-raspi.SlackBuild
+for PKGNAM in \
+  raspi-boot \
+  raspi-hacks \
+  kernel_raspi \
+  kernel-modules-raspi \
+  $INSTALLER \
+  $KNLSRC \
+; do
 
   echo "########################################"
   echo "#### $PKGNAM"
