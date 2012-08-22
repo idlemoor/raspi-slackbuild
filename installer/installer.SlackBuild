@@ -24,15 +24,10 @@
 #  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #------------------------------------------------------------------------------
-#
 # To run this script you will need:
 #   * initrd-versatile.img in this directory, possibly as a symlink to your
 #     armedslack-current tree (it's in armedslack-current/isolinux)
-#   * A recently built kernel tree with 'Image' and modules in
-#     '../kernel_raspi/linux'
-#   * The firmware git repo in '../raspi-boot/firmware'
-#   * 'Extra' packages already built in $OUTPUT
-#
+#   * kernel, modules, boot and hacks packages already built in $OUTPUT
 #------------------------------------------------------------------------------
 
 TMP=${TMP:-/tmp}
@@ -49,7 +44,8 @@ mkdir -p $MYTMP
 set -e
 
 #------------------------------------------------------------------------------
-# (0) Extract the installer tree from the upstream initrd
+# Extract the installer tree from the upstream 'versatile' initrd
+#------------------------------------------------------------------------------
 
 rm -rf $MYTMP/initrd-tree
 mkdir -p $MYTMP/initrd-tree
@@ -57,13 +53,8 @@ cd $MYTMP/initrd-tree
 zcat $CWD/initrd-versatile.img | cpio -iv
 
 #------------------------------------------------------------------------------
-# (1) Add raspi device nodes (maybe not needed -- to be checked)
-#
-# cd $MYTMP/initrd-tree/
-# tar xvf $CWD/../raspi-devs/_devs.tar.xz
-#
+# Add raspi specific README and extra packages to the installer tree
 #------------------------------------------------------------------------------
-# (2) Add README and raspi-extra to the installer tree
 
 cat $CWD/README.installer > $MYTMP/initrd-tree/README
 
@@ -74,6 +65,7 @@ for pkgbase in \
   kernel_raspi \
   kernel-modules-raspi
 do
+  # If there are multiple packages in $OUTPUT, use the most recent one
   pkg=$(ls -t $OUTPUT/$pkgbase-*.t?z | head -1)
   cp -a -v \
     $pkg \
@@ -81,24 +73,28 @@ do
 done
 
 #------------------------------------------------------------------------------
-# (3) Add kernel modules to the installer tree
+# Add kernel modules to the installer tree
+#------------------------------------------------------------------------------
 
 # Remove the versatile modules
 # (it might be helpful to qemu users to keep them, but they're just too big)
-rm -rf $MYTMP/initrd-tree/lib/modules/*
+cd $MYTMP/initrd-tree/
+rm -rf lib/modules/
 
-cd $CWD/../kernel_raspi/linux
-make modules_install INSTALL_MOD_PATH=$MYTMP/initrd-tree
+# Add the modules from the kernel-modules-raspi package
+tar xvf $MYTMP/initrd-tree/raspi-extra/kernel-modules-raspi-*.t?z lib/modules/
 
 #------------------------------------------------------------------------------
-# (4) Roll the initrd.  We name it 'install.gz' so it's recognisable and
+# Roll the initrd.  Name it 'install.gz' so it's recognisable and
 # can be removed after installation.
+#------------------------------------------------------------------------------
 
 cd $MYTMP/initrd-tree
 find . | cpio -o -v -H newc | gzip -9c > $MYTMP/install.gz
 
 #------------------------------------------------------------------------------
-# (5) Make an empty image and format it
+# Make an empty SD card image and format it
+#------------------------------------------------------------------------------
 
 rm -f $MYTMP/$IMAGE
 echo "Making $MYTMP/$IMAGE"
@@ -118,6 +114,7 @@ dd if=/dev/zero of=$MYTMP/$IMAGE bs=512 count=$(( 128 * 32 * 944 ))
 # Partition 3 start 1032192 end 3866623 type 83
 dd if=$CWD/mbr of=$MYTMP/$IMAGE bs=512 count=1 conv=notrunc
 
+# Set up devices /dev/md/raspimg{1,2,3} to access partitions on the card image
 LOOPDEV=$(losetup -f --show $MYTMP/$IMAGE)
 mdadm --build --force raspimg --level linear --raid-devices 1 $LOOPDEV
 # It takes a few secs to ready /dev/md/* apparently
@@ -137,44 +134,46 @@ if [ ! -f $OUTPUT/$EMPTY.xz ]; then
 fi
 
 #------------------------------------------------------------------------------
-# (6) Copy everything onto image partition 1
+# Put required boot files onto image partition 1
+#------------------------------------------------------------------------------
 
+# Extract the boot stuff from packages in installer's raspi-extra/
+cd $MYTMP
+tar xvf $MYTMP/initrd-tree/raspi-extra/raspi-boot-*.t?z   boot/
+tar xvf $MYTMP/initrd-tree/raspi-extra/kernel_raspi-*.t?z boot/
+
+# Mount the card image's boot partition
 mkdir -p $MYTMP/mnt
 mount -t vfat /dev/md/raspimg1 $MYTMP/mnt
 
-# Get the boot firmware and default config
-cd $CWD/../raspi-boot/firmware
+# Copy the required boot files
 cp -v \
-  boot/bootcode.bin boot/loader.bin \
+  boot/bootcode.bin \
+  boot/loader.bin \
   boot/LICENCE.broadcom \
+  boot/kernel.img \
   $MYTMP/mnt
 cp -v \
-  boot/arm224_start.elf \
+  boot/arm240_start.elf \
   $MYTMP/mnt/start.elf
-cat $CWD/../raspi-boot/config.txt.new > $MYTMP/mnt/config.txt
-
-# Kernel
-cp -v \
-  $CWD/../kernel_raspi/linux/arch/arm/boot/zImage \
-  $MYTMP/mnt/kernel.img
-# Take kernel command line from kernel config. 'root=' doesn't matter.
-grep 'CONFIG_CMDLINE=' $CWD/../kernel_raspi/linux/.config | \
-  sed -e 's/CONFIG_CMDLINE="//' -e 's/"$//' \
+cat boot/config.txt.new \
+  > $MYTMP/mnt/config.txt
+cat boot/cmdline.txt.new | sed 's:root=@ROOTDEV@:root=/dev/mmcblk0p3:' \
   > $MYTMP/mnt/cmdline.txt
 
-# Get install.gz
+# Copy the install.gz that we prepared earlier
 cp -v \
   $MYTMP/install.gz \
   $MYTMP/mnt/
 
-# Add initrd stuff for install.gz to /boot/config.txt and /boot/cmdline.txt
+# Add initrd parameters for install.gz to config.txt and cmdline.txt
 LOADADDR="0xa00000"
 SIZE="0x$(printf '%x' $(stat --format='%s' $MYTMP/mnt/install.gz))"
 echo "ramfsfile=install.gz" >> $MYTMP/mnt/config.txt
 echo "ramfsaddr=$LOADADDR"  >> $MYTMP/mnt/config.txt
 sed -i -e "s/\$/ initrd=$LOADADDR,$SIZE/" $MYTMP/mnt/cmdline.txt
 
-# Assemble the README
+# Compose the README
 cat $CWD/README.installer                   > $MYTMP/mnt/README
 echo ""                                    >> $MYTMP/mnt/README
 echo ""                                    >> $MYTMP/mnt/README
@@ -188,15 +187,17 @@ echo "Boot fw git rev......: $BREV"        >> $MYTMP/mnt/README
 echo "Build host...........: $(uname -a)"  >> $MYTMP/mnt/README
 echo "Build date...........: $(date)"      >> $MYTMP/mnt/README
 
-#------------------------------------------------------------------------------
-# (7) Compress and do a checksum
-
+# Unmount the boot partition and tear down the devices
 umount -v $MYTMP/mnt
 mdadm --stop /dev/md/raspimg
 losetup -d $LOOPDEV
 
-echo "Compressing image to $OUTPUT/$IMAGE.xz"
-xz -v < $MYTMP/$IMAGE     > $OUTPUT/$IMAGE.xz
+#------------------------------------------------------------------------------
+# Compress the card image and do a checksum
+#------------------------------------------------------------------------------
+
+echo  "Compressing image to $OUTPUT/$IMAGE.xz"
+xz -v  < $MYTMP/$IMAGE    > $OUTPUT/$IMAGE.xz
 sha1sum $OUTPUT/$IMAGE.xz > $OUTPUT/$IMAGE.xz.sha1
 
 rm $MYTMP/$IMAGE

@@ -44,6 +44,7 @@ rm -rf $PKG
 
 mkdir -p $PKG/usr/src/linux-$VERSION
 cd /usr/src/linux
+echo "Copying /usr/src/linux ..."
 cp -a \
   * \
   .gitignore .config .mailmap \
@@ -52,8 +53,8 @@ cp -a \
 cd $PKG/usr/src
 ln -s linux-$VERSION linux
 cd linux-$VERSION
-make clean
-make prepare
+make clean KDIR=$(pwd)
+make prepare KDIR=$(pwd)
 
 mkdir -p $PKG/install
 cp \
