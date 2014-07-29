@@ -1,0 +1,30 @@
+mkinitrd notes for Raspberry Pi
+-------------------------------
+
+If you were expecting to see the usual README.mkinitrd file, it's not
+here :-)
+
+This is because the Raspberry Pi boots from a vfat partition, and vfat
+does not support symlinks.  The documentation for mkinitrd is in the
+file /usr/doc/mkinitrd-1.4.7/README.initrd. 
+
+You don't need an initrd for the supplied Raspberry Pi kernel if your
+root filesystem is on the SDHC card or on most USB storage devices, but
+if you want to run mkinitrd, use the -s control argument, so that
+mkinitrd does not attempt to use /boot for the initrd-tree.  For example:
+
+  mkinitrd -c -s /tmp/initrd-tree -o /boot/initrd.gz \
+    -k 3.6.11-20130324 -f ext4 -m ext4 -r /dev/sda5
+
+To inform the Pi's bootloader and the kernel about /boot/initrd.gz, you
+need to edit the files /boot/config.txt and /boot/cmdline.txt.  Add these
+lines to /boot/config.txt:
+
+  ramfsfile=initrd.gz
+  ramfsaddr=0x00a00000
+
+Then add "initrd=0xa00000,0x<size>" (where <size> is the hex size of
+initrd.gz in bytes) to the command line options in /boot/cmdline.txt,
+for example
+
+  initrd=0xa00000,0x654da9 dwc_otg.lpm_enable=0 console=tty1 root=/dev/mmcblk0p3 rootfstype=ext4 rootwait ro

@@ -31,7 +31,8 @@
 #   git clone git://github.com/raspberrypi/linux.git
 #
 # and ensure that the branch for the kernel version you require is already
-# checked out.  The 'default branch' on Github is currently rpi-3.2.27.
+# checked out.  The 'default branch' on Github is currently 'rpi-3.6.y',
+# which is based on upstream 3.6.11.
 #
 #------------------------------------------------------------------------------
 
@@ -51,41 +52,62 @@ TMP=${TMP:-/tmp}
 PKG=$TMP/package-$PRGNAM
 OUTPUT=${OUTPUT:-/tmp}
 
-# To use a different kernel config file, set its path in $CONFIG
-# Note that if there is already a .config it will be overwritten.
-CONFIG=${CONFIG:-$CWD/config-$FLAVOUR}
-
 set -e
 
 rm -rf $PKG
 mkdir -p $PKG
 
 cd $CWD/linux
-make mrproper KDIR=$(pwd)
+git clean -f -x -d
+GITREV=$(git log --format='%h' -n 1)
 
+# Apply any local patches (hopefully none ;-)
 if [ -d $CWD/patches/ ]; then
+  # Ensure local branch is unmodified (avoid reapplying patches if SlackBuild is rerun)
   git checkout -f
   for pf in $CWD/patches/*; do
     patch --verbose -p1 <$pf
   done
 fi
 
-cat $CONFIG > .config
-
-GITREV=$(git log --format='%h' -n 1)
-
-make silentoldconfig LOCALVERSION="-$MYVER" KDIR=$(pwd)
-
+# Set $VERSION, $PATCHLEVEL, $SUBLEVEL, $EXTRAVERSION from kernel source Makefile
 head -4 Makefile | sed 's/ *= */=/' > $TMP/versionvars
 . $TMP/versionvars
 rm $TMP/versionvars
 KNLVER="${VERSION}.${PATCHLEVEL}.${SUBLEVEL}${EXTRAVERSION}-${MYVER}"
 PKGVER=$(echo "$KNLVER" | tr - _)
 
-make zImage $NUMJOBS LOCALVERSION="-$MYVER" KDIR=$(pwd)
+# To use a specific kernel config file, pass its path in $CONFIG
+# (note that if there is already a .config in the kernel tree, it will be replaced)
+if [ -n "$CONFIG" ]; then
+  if [ ! -f $CONFIG ]; then
+    echo "No kernel config found (looking for $CONFIG)"
+    exit 1
+  fi
+else
+  # Look for e.g. $CWD/config-raspi-3.6.11-blah
+  CONFIG=$CWD/config-$FLAVOUR-$VERSION.$PATCHLEVEL.$SUBLEVEL${EXTRAVERSION}
+  if [ ! -f $CONFIG ]; then
+    # ... or $CWD/config-raspi-3.6.11 ...
+    CONFIG=$CWD/config-$FLAVOUR-$VERSION.$PATCHLEVEL.$SUBLEVEL
+    if [ ! -f $CONFIG ]; then
+      # or $CWD/config-raspi-3.6
+      CONFIG=$CWD/config-$FLAVOUR-$VERSION.$PATCHLEVEL
+      if [ ! -f $CONFIG ]; then
+        echo "No kernel config found (looking for $CWD/config-${FLAVOUR}-${VERSION}.${PATCHLEVEL}[.${SUBLEVEL}${EXTRAVERSION}])"
+        exit 1
+      fi
+    fi
+  fi
+fi
+
+echo "Using kernel config $CONFIG"
+cat $CONFIG > .config
+make silentoldconfig LOCALVERSION="-$MYVER"
+
+make zImage $NUMJOBS LOCALVERSION="-$MYVER"
 
 mkdir -p $PKG/boot
-
 cp arch/arm/boot/zImage $PKG/boot/kernel.img
 cp System.map $PKG/boot/System.map
 
@@ -123,7 +145,7 @@ cd $PKG
 # Prepare and install the modules.  The kernel-modules SlackBuild traditionally
 # just picks them up from the running system.
 cd $CWD/linux
-make modules $NUMJOBS LOCALVERSION="-$MYVER" KDIR=$(pwd)
+make modules $NUMJOBS LOCALVERSION="-$MYVER"
 make modules_install KDIR=$(pwd)
 
 # Link the source for the modules & source SlackBuilds

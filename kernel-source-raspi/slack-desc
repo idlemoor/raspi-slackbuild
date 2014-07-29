@@ -5,15 +5,15 @@
 # exactly 11 lines for the formatting to be correct.  It's also customary to
 # leave one space after the ':'.
 
-             |-----handy-ruler------------------------------------------------------|
-kernel-source: kernel-source (Linux kernel source)
-kernel-source:
-kernel-source: Source code for Linus Torvalds' Linux kernel.
-kernel-source:
-kernel-source: This package contains the source to the Linux Kernel.  It was created
-kernel-source: from a compilation of a working Kernel, therefore includes all changes
-kernel-source: that have been applied to the Kernels shipped by the Raspberry Pi
-kernel-source: Foundation (see https://github.com/raspberrypi/linux).
-kernel-source:
-kernel-source: 
-kernel-source:
+                   |-----handy-ruler------------------------------------------------------|
+kernel-source-raspi: kernel-source-raspi (Linux kernel source for the Raspberry Pi)
+kernel-source-raspi:
+kernel-source-raspi: This package contains a Linux kernel source tree modified for the
+kernel-source-raspi: Raspberry Pi by the Raspberry Pi Foundation.
+kernel-source-raspi:
+kernel-source-raspi: It was obtained from the official git repository at:
+kernel-source-raspi: https://github.com/raspberrypi/linux
+kernel-source-raspi:
+kernel-source-raspi:
+kernel-source-raspi:
+kernel-source-raspi:

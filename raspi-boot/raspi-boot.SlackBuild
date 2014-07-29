@@ -55,44 +55,23 @@ chmod 644 *
 
 mkdir -p $PKG/boot
 cp -a \
-  bootcode.bin loader.bin LICENCE.broadcom \
+  bootcode.bin LICENCE.broadcom \
+  start*.elf fixup*.dat \
   $PKG/boot
-zcat $CWD/README.initrd.gz > $PKG/boot/README.initrd
-zcat $CWD/README.boot.gz   > $PKG/boot/README
-
-# The default memory allocation for the OS and GPU is set here (or by an env variable).
-# LINUXMEM must be set to 240 or 224 or 192 or 128.
-# The GPU will get the rest of memory, i.e. (256-$LINUXMEM) Mb.
-# We use the 224Mb version by default (upstream has 192Mb by default, but this
-# seems pointless until accelerated video works).
-LINUXMEM=${LINUXMEM:-224}
-cp -a \
-  arm${LINUXMEM}_start.elf \
-  $PKG/boot/start.elf.new
-
-# But we'll deliver all the start.elf files (as is customary) so the user can
-# change this if required:
-cp -a \
-  arm*_start.elf \
-  $PKG/boot/
-
-# Record the arm*_start.elf md5sums so start.elf can be identified at the next upgrade
-mkdir -p $PKG/var/lib/$PRGNAM
-md5sum arm*_start.elf > $PKG/var/lib/$PRGNAM/startelf.md5.new
-
-# There is now a documented 'safe mode', so we'll include upstream's prebuilt
-# 'emergency kernel' with its built-in busybox.
-# To boot it, add a jumper on pins 5 and 6 of P1.
-cp -a \
-  kernel_emergency.img \
-  $PKG/boot/
+cat $CWD/README.initrd    > $PKG/boot/README.initrd
+cat $CWD/README.bootfiles > $PKG/boot/README.bootfiles
 
 # Install config.txt as .new even though it's not in /etc
 cat < $CWD/config.txt.new > $PKG/boot/config.txt.new
 
+# The default memory allocation for the GPU is set here (or by an env variable).
+# The OS will get the rest of memory, i.e. (512-$GPUMEM) or (256-$GPUMEM) Mb.
+GPUMEM=${GPUMEM:-32}
+echo "gpu_mem=$GPUMEM" >> $PKG/boot/config.txt.new
+
 mkdir -p $PKG/usr/doc/$PRGNAM-$VERSION
 cp -a \
-  LICENCE.broadcom \
+  LICENCE.broadcom COPYING.linux \
   $PKG/usr/doc/$PRGNAM-$VERSION
 
 # Add version stamp into /boot and /usr/doc

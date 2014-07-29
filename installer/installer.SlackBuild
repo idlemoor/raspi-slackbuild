@@ -26,7 +26,7 @@
 #------------------------------------------------------------------------------
 # To run this script you will need:
 #   * initrd-versatile.img in this directory, possibly as a symlink to your
-#     armedslack-current tree (it's in armedslack-current/isolinux)
+#     armedslack-14.1 tree (it's in armedslack-14.1/isolinux)
 #   * kernel, modules, boot and hacks packages already built in $OUTPUT
 #------------------------------------------------------------------------------
 
@@ -120,9 +120,9 @@ mdadm --build --force raspimg --level linear --raid-devices 1 $LOOPDEV
 # It takes a few secs to ready /dev/md/* apparently
 sleep 5
 
-mkdosfs -I /dev/md/raspimg1
+mkdosfs -I /dev/md/raspimg1 -n RPiBoot
 mkswap /dev/md/raspimg2
-mkfs -t ext4 -O ^has_journal -E stride=2,stripe-width=1024 -b 4096 /dev/md/raspimg3
+mkfs -t ext4 -O ^has_journal -E stride=2,stripe-width=1024 -b 4096 -L SlackwareARM /dev/md/raspimg3
 
 # Save the empty SD card image as a useful by-product.
 # (Very time consuming, so only do this if needed.)
@@ -149,13 +149,11 @@ mount -t vfat /dev/md/raspimg1 $MYTMP/mnt
 # Copy the required boot files
 cp -v \
   boot/bootcode.bin \
-  boot/loader.bin \
+  boot/start.elf \
+  boot/fixup.dat \
   boot/LICENCE.broadcom \
   boot/kernel.img \
   $MYTMP/mnt
-cp -v \
-  boot/arm240_start.elf \
-  $MYTMP/mnt/start.elf
 cat boot/config.txt.new \
   > $MYTMP/mnt/config.txt
 cat boot/cmdline.txt.new | sed 's:root=@ROOTDEV@:root=/dev/mmcblk0p3:' \
@@ -173,23 +171,26 @@ echo "ramfsfile=install.gz" >> $MYTMP/mnt/config.txt
 echo "ramfsaddr=$LOADADDR"  >> $MYTMP/mnt/config.txt
 sed -i -e "s/\$/ initrd=$LOADADDR,$SIZE/" $MYTMP/mnt/cmdline.txt
 
-# Compose the README
-cat $CWD/README.installer                   > $MYTMP/mnt/README
-echo ""                                    >> $MYTMP/mnt/README
-echo ""                                    >> $MYTMP/mnt/README
-cat $MYTMP/initrd-tree/.installer-version  >> $MYTMP/mnt/README
-echo "Raspberry Pi:"                       >> $MYTMP/mnt/README
-echo "-------------"                       >> $MYTMP/mnt/README
+# Compose the README.installer
+cat $CWD/README.installer                   > $MYTMP/mnt/README.installer
+echo ""                                    >> $MYTMP/mnt/README.installer
+echo ""                                    >> $MYTMP/mnt/README.installer
+cat $MYTMP/initrd-tree/.installer-version  >> $MYTMP/mnt/README.installer
+echo "Raspberry Pi:"                       >> $MYTMP/mnt/README.installer
+echo "-------------"                       >> $MYTMP/mnt/README.installer
 KREV="$(cd $CWD/../kernel_raspi/linux; git log --format='%h' -n 1)"
-echo "Kernel git rev.......: $KREV"        >> $MYTMP/mnt/README
+echo "Kernel git rev.......: $KREV"        >> $MYTMP/mnt/README.installer
 BREV="$(cd $CWD/../raspi-boot/firmware; git log --format='%h' -n 1)"
-echo "Boot fw git rev......: $BREV"        >> $MYTMP/mnt/README
-echo "Build host...........: $(uname -a)"  >> $MYTMP/mnt/README
-echo "Build date...........: $(date)"      >> $MYTMP/mnt/README
+echo "Boot fw git rev......: $BREV"        >> $MYTMP/mnt/README.installer
+echo "Build host...........: $(uname -a)"  >> $MYTMP/mnt/README.installer
+echo "Build date...........: $(date)"      >> $MYTMP/mnt/README.installer
 
 # Unmount the boot partition and tear down the devices
+sync; sync
 umount -v $MYTMP/mnt
+sleep 5
 mdadm --stop /dev/md/raspimg
+sleep 5
 losetup -d $LOOPDEV
 
 #------------------------------------------------------------------------------

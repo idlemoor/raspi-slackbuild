@@ -53,8 +53,8 @@ cp -a \
 cd $PKG/usr/src
 ln -s linux-$VERSION linux
 cd linux-$VERSION
-make clean KDIR=$(pwd)
-make prepare KDIR=$(pwd)
+make clean
+make prepare
 
 mkdir -p $PKG/install
 cp \

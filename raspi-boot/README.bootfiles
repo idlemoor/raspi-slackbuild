@@ -1,0 +1,53 @@
+Raspberry Pi boot files
+-----------------------
+
+The Raspberry Pi uses its onboard GPU as a boot processor.  For people
+familiar with the VAX-11/780, the Pi's GPU acts like the VAX's console
+PDP-11, and vfat partition 1 on the Pi's SD card is the equivalent of
+the console floppy :-)
+
+
+bootcode.bin
+
+This file contains the GPU's boot code.
+
+
+start*.elf, fixup*.dat
+
+The 'start*.elf' files contain the GPU's firmware.  The 'fixup*.dat'
+files control the allocation of memory between Linux and the GPU.
+
+The Pi has a total of either 512Mb or 256Mb of memory.  The default
+allocation is set to 32Mb for the GPU, and all the rest for Linux.
+
+If you want to allocate more or less memory for the GPU, edit the
+config.txt file to change the line 'gpu_mem=32', and reboot.  Note that
+allocating less than 32Mb for the GPU may cause problems if you wish to
+play audio or change framebuffer settings.
+
+
+config.txt
+
+This file is read by the GPU at boot time and controls video modes,
+clocking and boot options.  For details see
+http://elinux.org/RPi_config.txt
+
+When you upgrade the raspi-boot package, a file named config.txt.new
+may be created - please inspect the contents of this file and merge them
+into your config.txt file.
+
+
+kernel.img, System.map
+
+kernel.img is the Linux kernel, and System.map is the kernel's symbol
+table.
+
+
+cmdline.txt
+
+This is the kernel's command line.  You can set kernel boot parameters
+by editing this file.
+
+When you upgrade the kernel_raspi package, a file named cmdline.txt.new
+may be created - please inspect the contents of this file and merge them
+into your cmdline.txt file.

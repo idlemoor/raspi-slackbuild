@@ -6,7 +6,8 @@ This script will run the following SlackBuilds:
   raspi-hacks
   kernel_raspi
   kernel-modules-raspi
-  installer
+  installer (if DOINSTALLER=yes)
+  kernel-source-raspi (if DOSOURCE=yes)
 
 Before running this script, you must set up the following git repos:
 
@@ -14,3 +15,10 @@ Before running this script, you must set up the following git repos:
             kernel_raspi/linux
   git clone git://github.com/raspberrypi/firmware.git \
             raspi-boot/firmware
+
+Then you must checkout the branch for the kernel version that you want
+to build, for example:
+
+  cd kernel_raspi/linux
+  git checkout -b rpi-3.12.y -t origin/rpi-3.12.y
+  cd -
