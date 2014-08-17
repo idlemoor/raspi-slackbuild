@@ -53,20 +53,16 @@ CWD=$(pwd)
 
 set -e
 
-if [ "${DOINSTALLER:-no}" = 'yes' ]; then
-  INSTALLER='installer'
-fi
-if [ "${DOSOURCE:-no}" = 'yes' ]; then
-  KNLSRC='kernel-source-raspi'
-fi
+[ "${DOSOURCE:-no}" = 'yes' ] && KNLSRC='kernel-source-raspi'
+[ "${DOINSTALLER:-no}" = 'yes' ] && INSTALLER='installer'
 
 for PKGNAM in \
   raspi-boot \
   raspi-hacks \
   kernel_raspi \
   kernel-modules-raspi \
-  $INSTALLER \
   $KNLSRC \
+  $INSTALLER \
 ; do
 
   echo "########################################"
