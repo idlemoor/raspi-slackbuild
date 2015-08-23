@@ -165,7 +165,7 @@ cp -v \
   $MYTMP/mnt/
 
 # Add initrd parameters for install.gz to config.txt and cmdline.txt
-LOADADDR="0xa00000"
+LOADADDR="0xe00000"
 SIZE="0x$(printf '%x' $(stat --format='%s' $MYTMP/mnt/install.gz))"
 echo "ramfsfile=install.gz" >> $MYTMP/mnt/config.txt
 echo "ramfsaddr=$LOADADDR"  >> $MYTMP/mnt/config.txt
